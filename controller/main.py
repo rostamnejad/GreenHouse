@@ -55,7 +55,7 @@ class HumidityLight:
         if value < 18:
             return "cold", 0.6, (0, 150, 255)
         if value <= 28:
-            return "temp_good", 0, (0, 190, 40)
+            return "temp_good", 0, (0, 200, 0)
         if value <= 32:
             return "warm", 0.45, (255, 170, 0)
         return "hot", 1.0, (255, 0, 0)
@@ -70,7 +70,7 @@ class HumidityLight:
         if value < 45:
             return "low_humidity", 0.45, (255, 115, 0)
         if value <= 70:
-            return "humidity_good", 0, (0, 190, 40)
+            return "humidity_good", 0, (0, 200, 0)
         if value <= 85:
             return "humid", 0.45, (0, 80, 255)
         return "too_humid", 1.0, (190, 0, 255)
@@ -80,7 +80,7 @@ class HumidityLight:
             return (40, 40, 40)
 
         if temp_severity == 0 and humidity_severity == 0:
-            return (0, 190, 40)
+            return (0, 200, 0)
 
         total = 0
         red = 0
@@ -102,7 +102,7 @@ class HumidityLight:
             total += weight
 
         if total == 0:
-            return (0, 190, 40)
+            return (0, 200, 0)
 
         return (int(red / total), int(green / total), int(blue / total))
 
@@ -331,11 +331,11 @@ def ota_status(light, event, local_version, remote_version, path):
     if event == "checking":
         light.show_color((0, 30, 80))
     elif event == "up_to_date":
-        light.show_color((0, 80, 25))
+        light.show_color((0, 90, 0))
     elif event in ("update_available", "downloading", "installing"):
         light.show_color((90, 0, 160))
     elif event == "installed":
-        light.show_color((0, 160, 40))
+        light.show_color((0, 180, 0))
     elif event == "disabled":
         pass
 
@@ -369,7 +369,7 @@ def ota_check_interval_ms():
 def show_activation(light):
     print("RGB activation ready")
     for _ in range(8):
-        light.show_color((0, 180, 45))
+        light.show_color((0, 220, 0))
         time.sleep_ms(120)
         light.off()
         time.sleep_ms(120)

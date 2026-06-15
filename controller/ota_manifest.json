@@ -1,21 +1,16 @@
 {
-    "version":  3,
+    "version":  4,
     "device":  "controller",
     "files":  [
                   {
                       "path":  "version.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/version.py",
-                      "sha256":  "cf4c933901f3be4e47dda3d515b0f706939122f7903e73738cab26619e3cd94f"
-                  },
-                  {
-                      "path":  "boot.py",
-                      "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/boot.py",
-                      "sha256":  "c6cee680f361f99c5bfcbd2c2f9a2ac32458f7e6b78fbc77d24bc0ed7a9cadcf"
+                      "sha256":  "dd5a533fc8a2a14046ae800e3987975756443866eea1fba26a94b649c2098ed0"
                   },
                   {
                       "path":  "main.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/main.py",
-                      "sha256":  "cdb8acd5c4892c6001688fc04a81616f2ca64251b064c2b6b9be93f2b0175807"
+                      "sha256":  "36fbe7370f172666463f545f1ae5904066f38dea2bac109195493072b633e885"
                   },
                   {
                       "path":  "ota_updater.py",
@@ -23,5 +18,5 @@
                       "sha256":  "5b3ba9bac63970890c46c39a86aafc93e42ae42da2c39aea91a56267e4617f67"
                   }
               ],
-    "signature":  "9a527019650053f23186ccb651baa6ee2c6f220f54687c2c587139885c97831b"
+    "signature":  "e76ec942cafa8a632b41c0fc7622578c2fce5d34dda1dea42c2d2deceed871b4"
 }

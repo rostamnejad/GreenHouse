@@ -9,7 +9,7 @@ from version import APP_VERSION
 RGB_PIN = 48
 RGB_COUNT = 1
 CONNECTING_COLOR = (160, 0, 0)
-CONNECTED_COLOR = (0, 160, 40)
+CONNECTED_COLOR = (0, 200, 0)
 
 
 class BootLight:
