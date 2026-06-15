@@ -1,16 +1,16 @@
 {
-    "version":  2,
+    "version":  3,
     "device":  "sensors",
     "files":  [
                   {
                       "path":  "version.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/sensors/version.py",
-                      "sha256":  "213afae9af289d2c69d312344724a7f81c9bae1a4cefa3ca2e789100f9cb5c24"
+                      "sha256":  "cf4c933901f3be4e47dda3d515b0f706939122f7903e73738cab26619e3cd94f"
                   },
                   {
                       "path":  "main.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/sensors/main.py",
-                      "sha256":  "a75e649faeeb72c0a75ea6a74808ea209819f25ac5a6575ca37e13b3afc68f3e"
+                      "sha256":  "5cca2edb227b9d1aaeb9c521eef728097f524d494398e6e440a8746ffa5f5fb1"
                   },
                   {
                       "path":  "ota_updater.py",
@@ -18,5 +18,5 @@
                       "sha256":  "5b3ba9bac63970890c46c39a86aafc93e42ae42da2c39aea91a56267e4617f67"
                   }
               ],
-    "signature":  "80092d0ef6e1930219a068eadaf615473acd0fca47990a8ee45b6d349ce264fb"
+    "signature":  "d020c807bf617fa0635a4419e9c52860427758910862ed50d30afa67baaf2822"
 }

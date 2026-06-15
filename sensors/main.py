@@ -1,6 +1,7 @@
 from machine import I2C, Pin
 from time import sleep, sleep_ms, sleep_us
 import time
+import network
 from version import APP_VERSION, OTA_CHECK_INTERVAL_SECONDS
 
 
@@ -158,8 +159,11 @@ class TM1637:
         "C": 0x39,
         "D": 0x5E,
         "E": 0x79,
+        "F": 0x71,
         "H": 0x76,
+        "I": 0x06,
         "L": 0x38,
+        "N": 0x54,
         "O": 0x3F,
         "P": 0x73,
         "R": 0x50,
@@ -167,6 +171,7 @@ class TM1637:
         "T": 0x78,
         "U": 0x3E,
         "V": 0x3E,
+        "W": 0x3E,
     }
 
     def __init__(self, clk_pin, dio_pin, brightness=4):
@@ -245,6 +250,13 @@ class TM1637:
         version = max(0, min(999, int(version)))
         self.show("V%03d" % version)
 
+    def scroll(self, text, delay_ms=220, repeat=1):
+        padded = "    " + str(text) + "    "
+        for _ in range(repeat):
+            for index in range(len(padded) - 3):
+                self.show(padded[index : index + 4])
+                sleep_ms(delay_ms)
+
 
 class HumidityAlarm:
     def __init__(self, pin_number=BEEPER_PIN):
@@ -276,6 +288,19 @@ class HumidityAlarm:
                 self.last_alarm_ms = time.ticks_ms()
         else:
             self.beeper.value(0)
+
+    def notify_wifi_connected(self):
+        self._pulse(3, 70, 90)
+
+
+def show_wifi_status(display, alarm):
+    wlan = network.WLAN(network.STA_IF)
+    display.scroll(" WIFI ", 170, 1)
+    if wlan.isconnected():
+        display.scroll(" WIFI CONN V%03d " % APP_VERSION, 170, 1)
+        alarm.notify_wifi_connected()
+    else:
+        display.scroll(" WIFI NO  ", 170, 1)
 
 
 def sync_time():
@@ -436,6 +461,7 @@ def main():
     mux = TCA9548A(i2c, I2C_MUX_ADDR)
     display = TM1637(TM1637_CLK, TM1637_DIO, DISPLAY_BRIGHTNESS)
     alarm = HumidityAlarm(BEEPER_PIN)
+    show_wifi_status(display, alarm)
 
     mux.select(BMP280_CHANNEL)
     pressure_sensor = BMP280(i2c, BMP280_ADDR)
