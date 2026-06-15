@@ -31,10 +31,15 @@ def _get_config():
     hmac_key = getattr(secrets, "OTA_HMAC_KEY", "")
     device = getattr(secrets, "OTA_DEVICE", "")
     token = getattr(secrets, "GITHUB_TOKEN", "")
+    requires_token = getattr(secrets, "OTA_REQUIRES_TOKEN", False)
     allow_boot = getattr(secrets, "OTA_ALLOW_BOOT_UPDATE", False)
 
     if not manifest_url or not hmac_key or not device:
         print("OTA disabled: missing OTA_MANIFEST_URL, OTA_HMAC_KEY, or OTA_DEVICE")
+        return None
+
+    if requires_token and not token:
+        print("OTA disabled: private repository token is missing")
         return None
 
     return {
@@ -92,6 +97,18 @@ def _manifest_payload(manifest):
     return "\n".join(lines)
 
 
+def _decode_github_content_api(data):
+    try:
+        payload = json.loads(data.decode())
+    except Exception:
+        return data
+
+    if payload.get("encoding") != "base64" or "content" not in payload:
+        return data
+
+    return binascii.a2b_base64(payload["content"])
+
+
 def _request(url, token=""):
     try:
         import urequests as requests
@@ -107,7 +124,7 @@ def _request(url, token=""):
         status = getattr(response, "status_code", 200)
         if status != 200:
             raise RuntimeError("HTTP %s for %s" % (status, url))
-        return response.content
+        return _decode_github_content_api(response.content)
     finally:
         try:
             response.close()

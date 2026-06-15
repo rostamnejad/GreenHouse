@@ -8,6 +8,7 @@ OTA_CHECK_INTERVAL_SECONDS = 300
 
 # Only needed for a private repository. Prefer a public signed manifest or a proxy.
 GITHUB_TOKEN = ""
+OTA_REQUIRES_TOKEN = False
 
 # Keep this False unless you deliberately want OTA to replace boot.py.
 OTA_ALLOW_BOOT_UPDATE = False

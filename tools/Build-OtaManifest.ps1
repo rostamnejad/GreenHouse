@@ -9,6 +9,10 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$RawBaseUrl,
 
+    [string]$Ref = "master",
+
+    [switch]$UseGitHubApi,
+
     [string[]]$Files = @("version.py", "main.py", "ota_updater.py")
 )
 
@@ -42,7 +46,11 @@ foreach ($file in $Files) {
     }
 
     $sha = (Get-FileHash -Path $localPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    $url = "$base/$file"
+    if ($UseGitHubApi) {
+        $url = "$base/${file}?ref=$Ref"
+    } else {
+        $url = "$base/$file"
+    }
     $entries += [ordered]@{
         path = $file
         url = $url

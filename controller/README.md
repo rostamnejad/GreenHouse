@@ -43,7 +43,8 @@ OTA updates from GitHub:
 - Controller serial output includes `CONTROLLER_VERSION`; sensor readings include `SENSOR_VERSION`.
 - Sensor board TM1637 shows `V###` for the current firmware version, `OTA` while checking, and `UPD` while updating.
 - Do not commit real `secrets.py`, `OTA_HMAC_KEY`, or `GITHUB_TOKEN`; `.gitignore` excludes them.
-- Prefer a public repo or public release artifacts with signed manifests. For private repos, use a fine-grained read-only token or a small proxy; never use a token with write/admin permission on the board.
+- Prefer a public repo or public release artifacts with signed manifests. For private repos, use the GitHub Contents API plus a fine-grained read-only token or a small proxy; never use a token with write/admin permission on the board.
+- For private repositories set `OTA_REQUIRES_TOKEN = True`; OTA stays disabled until `GITHUB_TOKEN` is present.
 
 Build an OTA manifest from the project root:
 - Set a local signing key:
@@ -52,3 +53,5 @@ Build an OTA manifest from the project root:
   `powershell -ExecutionPolicy Bypass -File .\tools\Build-OtaManifest.ps1 -Device controller -Version 1 -RawBaseUrl https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/controller`
 - Sensors:
   `powershell -ExecutionPolicy Bypass -File .\tools\Build-OtaManifest.ps1 -Device sensors -Version 1 -RawBaseUrl https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/sensors`
+- Private GitHub repository example:
+  `powershell -ExecutionPolicy Bypass -File .\tools\Build-OtaManifest.ps1 -Device controller -Version 1 -RawBaseUrl https://api.github.com/repos/YOUR_USER/YOUR_REPO/contents/controller -UseGitHubApi -Ref master`
