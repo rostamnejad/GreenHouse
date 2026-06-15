@@ -43,10 +43,9 @@ OTA updates from GitHub:
 - Controller serial output includes `CONTROLLER_VERSION`; sensor readings include `SENSOR_VERSION`.
 - Sensor board TM1637 shows `V###` for the current firmware version, `OTA` while checking, and `UPD` while updating.
 - Do not commit real `secrets.py`, `OTA_HMAC_KEY`, or `GITHUB_TOKEN`; `.gitignore` excludes them.
-- Prefer a separate public artifact repository such as `rostamnejad/GreenHouse-OTA`; keep the main source repository private.
-- The public OTA repository must contain only signed firmware artifacts (`version.py`, `main.py`, `ota_updater.py`, `ota_manifest.json`) and no `secrets.py`.
-- Keep `GITHUB_TOKEN = ""` and `OTA_REQUIRES_TOKEN = False` on the boards when using public signed artifacts.
-- Keep `OTA_ENABLED = False` until the public OTA repository exists and the first bundle has been pushed.
+- If this repository is public, boards can read OTA files from `raw.githubusercontent.com` without any GitHub token.
+- Keep `GITHUB_TOKEN = ""` and `OTA_REQUIRES_TOKEN = False` on the boards when using a public repository.
+- The public repository must never contain real `secrets.py`; `.gitignore` excludes it.
 
 Build an OTA manifest from the project root:
 - Set a local signing key:
@@ -55,5 +54,5 @@ Build an OTA manifest from the project root:
   `powershell -ExecutionPolicy Bypass -File .\tools\Build-OtaManifest.ps1 -Device controller -Version 1 -RawBaseUrl https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/controller`
 - Sensors:
   `powershell -ExecutionPolicy Bypass -File .\tools\Build-OtaManifest.ps1 -Device sensors -Version 1 -RawBaseUrl https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/sensors`
-- Build a token-free public OTA bundle:
-  `powershell -ExecutionPolicy Bypass -File .\tools\Build-PublicOtaBundle.ps1 -Version 2 -Owner rostamnejad -Repository GreenHouse-OTA -Branch main`
+- Public repository example:
+  `powershell -ExecutionPolicy Bypass -File .\tools\Build-OtaManifest.ps1 -Device controller -Version 2 -RawBaseUrl https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller`

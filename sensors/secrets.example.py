@@ -2,8 +2,8 @@ WIFI_SSID = "YOUR_WIFI_NAME"
 WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"
 
 OTA_DEVICE = "sensors"
-OTA_ENABLED = False
-OTA_MANIFEST_URL = "https://raw.githubusercontent.com/YOUR_USER/GreenHouse-OTA/main/sensors/ota_manifest.json"
+OTA_ENABLED = True
+OTA_MANIFEST_URL = "https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/master/sensors/ota_manifest.json"
 OTA_HMAC_KEY = "CHANGE_ME_LONG_RANDOM_SECRET_NOT_IN_GITHUB"
 OTA_CHECK_INTERVAL_SECONDS = 300
 
