@@ -128,6 +128,28 @@ def _write_version(version):
         file.write(str(version))
 
 
+def get_current_version(default_version=0):
+    try:
+        default_version = int(default_version)
+    except Exception:
+        default_version = 0
+
+    stored_version = _read_version()
+    if stored_version > default_version:
+        return stored_version
+    return default_version
+
+
+def _notify(callback, event, local_version=0, remote_version=0, path=""):
+    if callback is None:
+        return
+
+    try:
+        callback(event, local_version, remote_version, path)
+    except Exception as exc:
+        print("OTA_STATUS_CALLBACK_ERROR", repr(exc))
+
+
 def _exists(path):
     try:
         os.stat(path)
@@ -199,10 +221,14 @@ def _install_file(file_info):
     os.rename(tmp_path, path)
 
 
-def check_for_updates():
+def check_for_updates(current_version=0, status_callback=None):
     config = _get_config()
     if config is None:
+        _notify(status_callback, "disabled")
         return False
+
+    local_version = get_current_version(current_version)
+    _notify(status_callback, "checking", local_version)
 
     manifest_bytes = _request(config["manifest_url"], config["token"])
     manifest = json.loads(manifest_bytes.decode())
@@ -218,9 +244,9 @@ def check_for_updates():
         raise RuntimeError("OTA manifest signature mismatch")
 
     remote_version = int(manifest.get("version", 0))
-    local_version = _read_version()
     if remote_version <= local_version:
         print("OTA up to date: version", local_version)
+        _notify(status_callback, "up_to_date", local_version, remote_version)
         return False
 
     files = manifest.get("files", [])
@@ -233,14 +259,30 @@ def check_for_updates():
             raise RuntimeError("Unsafe OTA path: %s" % path)
 
     print("OTA update available:", local_version, "->", remote_version)
+    _notify(status_callback, "update_available", local_version, remote_version)
     for file_info in files:
+        _notify(
+            status_callback,
+            "downloading",
+            local_version,
+            remote_version,
+            file_info.get("path", ""),
+        )
         _stage_file(file_info, config["token"])
 
     for file_info in files:
+        _notify(
+            status_callback,
+            "installing",
+            local_version,
+            remote_version,
+            file_info.get("path", ""),
+        )
         _install_file(file_info)
 
     _write_version(remote_version)
     print("OTA installed version", remote_version)
+    _notify(status_callback, "installed", local_version, remote_version)
 
     import machine
 

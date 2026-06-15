@@ -360,6 +360,8 @@ function Show-Dashboard {
     $humidity = Get-Number $Data "HUMIDITY"
     $pressure = Get-Number $Data "PRESSURE_MBAR"
     $altitude = Get-Number $Data "ALTITUDE_M"
+    $controllerVersion = Get-Field $Data "CONTROLLER_VERSION"
+    $sensorVersion = Get-Field $Data "SENSOR_VERSION"
     $state = Get-Field $Data "STATE" "waiting"
     $tempState = Get-Field $Data "TEMP_STATE" ""
     $humidityState = Get-Field $Data "HUMIDITY_STATE" ""
@@ -412,6 +414,8 @@ function Show-Dashboard {
     Write-Metric "Altitude" (Format-Number $altitude "0.0") "m" "barometric estimate" "White"
     Write-Metric "Local time" $timeText "" "from sensor board" "White"
     Write-Metric "Jalali date" $dateText "" "from sensor board" "White"
+    Write-Metric "Controller FW" $controllerVersion "" "firmware version" "White"
+    Write-Metric "Sensor FW" $sensorVersion "" "firmware version" "White"
 
     Write-Host ""
     Write-Host "  RGB state       " -NoNewline -ForegroundColor DarkGray
@@ -436,7 +440,7 @@ $lastParameterAt = $null
 $lastLine = ""
 
 if ($Sample) {
-    $lastLine = "PARAMETERS TIME=21:45 JDATE=1405/03/25 TEMP_C=31.20 HUMIDITY=38.10 PRESSURE_MBAR=863.12 ALTITUDE_M=1332.4 TEMP_STATE=warm HUMIDITY_STATE=low_humidity STATE=warning"
+    $lastLine = "PARAMETERS TIME=21:45 JDATE=1405/03/25 TEMP_C=31.20 HUMIDITY=38.10 PRESSURE_MBAR=863.12 ALTITUDE_M=1332.4 CONTROLLER_VERSION=2 SENSOR_VERSION=2 TEMP_STATE=warm HUMIDITY_STATE=low_humidity STATE=warning"
     $latest = Parse-ParameterLine $lastLine
     $lastParameterAt = Get-Date
     Show-Dashboard $latest $resolvedPort $BaudRate $startedAt $lastParameterAt $lastLine

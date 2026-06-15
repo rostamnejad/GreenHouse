@@ -36,8 +36,12 @@ Terminal dashboard:
 
 OTA updates from GitHub:
 - `boot.py` connects to WiFi, then calls `ota_updater.check_for_updates()`.
+- `main.py` also checks for updates every `OTA_CHECK_INTERVAL_SECONDS` seconds; default is 300 seconds.
 - OTA is disabled until `OTA_DEVICE`, `OTA_MANIFEST_URL`, and `OTA_HMAC_KEY` are added to the board's local `secrets.py`.
 - The board verifies the HMAC-signed manifest and SHA256 of every downloaded file before installing.
+- Every firmware release should bump `version.py` and the OTA manifest `version` to the same number.
+- Controller serial output includes `CONTROLLER_VERSION`; sensor readings include `SENSOR_VERSION`.
+- Sensor board TM1637 shows `V###` for the current firmware version, `OTA` while checking, and `UPD` while updating.
 - Do not commit real `secrets.py`, `OTA_HMAC_KEY`, or `GITHUB_TOKEN`; `.gitignore` excludes them.
 - Prefer a public repo or public release artifacts with signed manifests. For private repos, use a fine-grained read-only token or a small proxy; never use a token with write/admin permission on the board.
 

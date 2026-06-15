@@ -1,0 +1,22 @@
+{
+    "version":  2,
+    "device":  "controller",
+    "files":  [
+                  {
+                      "path":  "version.py",
+                      "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/version.py",
+                      "sha256":  "213afae9af289d2c69d312344724a7f81c9bae1a4cefa3ca2e789100f9cb5c24"
+                  },
+                  {
+                      "path":  "main.py",
+                      "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/main.py",
+                      "sha256":  "d4d042c7ce7fc655a6d5e70e0960a063eb4e46b90750fd02bb2dd704c0f7fac8"
+                  },
+                  {
+                      "path":  "ota_updater.py",
+                      "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/ota_updater.py",
+                      "sha256":  "714b6d6b7c718d5f5a2faed6bb6ba0a5d25832ec4c345da8a072d684ab67d36c"
+                  }
+              ],
+    "signature":  "627fc5b90f25d6955e06dddea411487dd3905ae0daeac514f1bbbce76ab6c49d"
+}

@@ -9,7 +9,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$RawBaseUrl,
 
-    [string[]]$Files = @("main.py", "ota_updater.py")
+    [string[]]$Files = @("version.py", "main.py", "ota_updater.py")
 )
 
 Set-StrictMode -Version Latest

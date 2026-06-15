@@ -5,6 +5,7 @@ import time
 import network
 from machine import Pin
 from neopixel import NeoPixel
+from version import APP_VERSION, OTA_CHECK_INTERVAL_SECONDS
 
 
 RGB_PIN = 48
@@ -16,6 +17,7 @@ PARAMETER_KEYS = (
     "humidity",
     "pressure_mbar",
     "altitude_m",
+    "sensor_version",
     "hour",
     "minute",
     "jy",
@@ -39,6 +41,10 @@ class HumidityLight:
 
     def off(self):
         self.led[0] = (0, 0, 0)
+        self.led.write()
+
+    def show_color(self, color):
+        self.led[0] = color
         self.led.write()
 
     def _temperature_condition(self, value):
@@ -207,7 +213,7 @@ def parse_parameters(path):
             if key in query:
                 parameters[key] = float(query[key])
 
-        for key in ("hour", "minute", "jy", "jm", "jd"):
+        for key in ("sensor_version", "hour", "minute", "jy", "jm", "jd"):
             if key in query:
                 parameters[key] = int(query[key])
 
@@ -259,9 +265,13 @@ def status_body(parameters, light):
     if parameters["altitude_m"] is not None:
         altitude_value = "%.1f" % parameters["altitude_m"]
 
+    sensor_version = "None"
+    if parameters["sensor_version"] is not None:
+        sensor_version = "%d" % parameters["sensor_version"]
+
     return (
         "time=%s jdate=%s temp_c=%s humidity=%s pressure_mbar=%s altitude_m=%s "
-        "temp_state=%s humidity_state=%s state=%s"
+        "controller_version=%d sensor_version=%s temp_state=%s humidity_state=%s state=%s"
         % (
             time_value,
             date_value,
@@ -269,6 +279,8 @@ def status_body(parameters, light):
             humidity_value,
             pressure_value,
             altitude_value,
+            APP_VERSION,
+            sensor_version,
             light.temperature_label,
             light.humidity_label,
             light.label,
@@ -304,10 +316,54 @@ def print_serial_parameters(parameters, light):
     if parameters["altitude_m"] is not None:
         parts.append("ALTITUDE_M=%.1f" % parameters["altitude_m"])
 
+    parts.append("CONTROLLER_VERSION=%d" % APP_VERSION)
+    if parameters["sensor_version"] is not None:
+        parts.append("SENSOR_VERSION=%d" % parameters["sensor_version"])
+
     parts.append("TEMP_STATE=%s" % light.temperature_label)
     parts.append("HUMIDITY_STATE=%s" % light.humidity_label)
     parts.append("STATE=%s" % light.label)
     print("PARAMETERS " + " ".join(parts))
+
+
+def ota_status(light, event, local_version, remote_version, path):
+    print("OTA_STATUS", event, local_version, remote_version, path)
+    if event == "checking":
+        light.show_color((0, 30, 80))
+    elif event == "up_to_date":
+        light.show_color((0, 80, 25))
+    elif event in ("update_available", "downloading", "installing"):
+        light.show_color((90, 0, 160))
+    elif event == "installed":
+        light.show_color((0, 160, 40))
+    elif event == "disabled":
+        pass
+
+
+def check_ota_periodic(light):
+    try:
+        import ota_updater
+
+        ota_updater.check_for_updates(
+            current_version=APP_VERSION,
+            status_callback=lambda event, local, remote, path: ota_status(
+                light, event, local, remote, path
+            ),
+        )
+    except Exception as exc:
+        print("OTA_ERROR", repr(exc))
+        light.show_color((160, 0, 0))
+
+
+def ota_check_interval_ms():
+    try:
+        import secrets
+
+        seconds = getattr(secrets, "OTA_CHECK_INTERVAL_SECONDS", OTA_CHECK_INTERVAL_SECONDS)
+    except Exception:
+        seconds = OTA_CHECK_INTERVAL_SECONDS
+
+    return int(seconds * 1000)
 
 
 def make_server(port=HTTP_PORT):
@@ -340,8 +396,9 @@ def main():
         parameters[key] = None
 
     server = make_server()
+    last_ota_check_ms = time.ticks_ms()
 
-    print("Controller humidity RGB server started")
+    print("Controller humidity RGB server started VERSION=%d" % APP_VERSION)
     if wlan.isconnected():
         print("WiFi OK IP:", wlan.ifconfig()[0])
     else:
@@ -349,6 +406,10 @@ def main():
 
     while True:
         light.animate()
+        now_ms = time.ticks_ms()
+        if time.ticks_diff(now_ms, last_ota_check_ms) >= ota_check_interval_ms():
+            check_ota_periodic(light)
+            last_ota_check_ms = time.ticks_ms()
 
         try:
             client, address = server.accept()

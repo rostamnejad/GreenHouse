@@ -1,6 +1,7 @@
 from machine import I2C, Pin
 from time import sleep, sleep_ms, sleep_us
 import time
+from version import APP_VERSION, OTA_CHECK_INTERVAL_SECONDS
 
 
 I2C_SDA = 21
@@ -155,13 +156,17 @@ class TM1637:
         "9": 0x6F,
         "A": 0x77,
         "C": 0x39,
+        "D": 0x5E,
         "E": 0x79,
         "H": 0x76,
         "L": 0x38,
+        "O": 0x3F,
         "P": 0x73,
         "R": 0x50,
         "S": 0x6D,
         "T": 0x78,
+        "U": 0x3E,
+        "V": 0x3E,
     }
 
     def __init__(self, clk_pin, dio_pin, brightness=4):
@@ -236,6 +241,10 @@ class TM1637:
         segments[1] |= 0x80
         self.write_segments(segments)
 
+    def show_version(self, version):
+        version = max(0, min(999, int(version)))
+        self.show("V%03d" % version)
+
 
 class HumidityAlarm:
     def __init__(self, pin_number=BEEPER_PIN):
@@ -301,7 +310,7 @@ def send_parameters_to_controller(
 
         request = (
             "GET /parameters?temp_c=%.2f&humidity=%.2f&pressure_mbar=%.2f&altitude_m=%.1f"
-            "&hour=%d&minute=%d&jy=%d&jm=%d&jd=%d HTTP/1.0\r\n"
+            "&sensor_version=%d&hour=%d&minute=%d&jy=%d&jm=%d&jd=%d HTTP/1.0\r\n"
             "Host: %s\r\n"
             "Connection: close\r\n"
             "\r\n"
@@ -310,6 +319,7 @@ def send_parameters_to_controller(
             humidity,
             pressure_mbar,
             altitude_m,
+            APP_VERSION,
             now[3],
             now[4],
             jy,
@@ -376,6 +386,51 @@ def gregorian_to_jalali(gy, gm, gd):
     return jy, jm, jd
 
 
+def ota_status(display, event, local_version, remote_version, path):
+    print("OTA_STATUS", event, local_version, remote_version, path)
+    if event == "checking":
+        display.show("OTA ")
+    elif event == "up_to_date":
+        display.show_version(local_version)
+    elif event == "update_available":
+        display.show("UPD ")
+        sleep(1)
+        display.show_version(remote_version)
+    elif event in ("downloading", "installing"):
+        display.show("UPD ")
+    elif event == "installed":
+        display.show("UPD ")
+    elif event == "disabled":
+        pass
+
+
+def check_ota_periodic(display):
+    try:
+        import ota_updater
+
+        ota_updater.check_for_updates(
+            current_version=APP_VERSION,
+            status_callback=lambda event, local, remote, path: ota_status(
+                display, event, local, remote, path
+            ),
+        )
+    except Exception as exc:
+        print("OTA_ERROR", repr(exc))
+        display.show("Err ")
+        sleep(1)
+
+
+def ota_check_interval_ms():
+    try:
+        import secrets
+
+        seconds = getattr(secrets, "OTA_CHECK_INTERVAL_SECONDS", OTA_CHECK_INTERVAL_SECONDS)
+    except Exception:
+        seconds = OTA_CHECK_INTERVAL_SECONDS
+
+    return int(seconds * 1000)
+
+
 def main():
     i2c = I2C(0, sda=Pin(I2C_SDA), scl=Pin(I2C_SCL), freq=100000)
     mux = TCA9548A(i2c, I2C_MUX_ADDR)
@@ -388,12 +443,20 @@ def main():
     mux.select(SHT20_CHANNEL)
     sensor = SHT20(i2c, SHT20_ADDR)
     last_time_sync = 0
+    last_ota_check_ms = time.ticks_ms()
+    display.show_version(APP_VERSION)
+    sleep(2)
     if sync_time():
         last_time_sync = time.time()
 
-    print("GreenHouse display loop started")
+    print("GreenHouse display loop started VERSION=%d" % APP_VERSION)
     while True:
         try:
+            now_ms = time.ticks_ms()
+            if time.ticks_diff(now_ms, last_ota_check_ms) >= ota_check_interval_ms():
+                check_ota_periodic(display)
+                last_ota_check_ms = time.ticks_ms()
+
             if last_time_sync == 0 or time.time() - last_time_sync >= TIME_SYNC_INTERVAL_SECONDS:
                 if sync_time():
                     last_time_sync = time.time()
@@ -432,6 +495,8 @@ def main():
             display.show("ALT ")
             sleep(1)
             display.show("%4d" % int(round(altitude_m)))
+            sleep(3)
+            display.show_version(APP_VERSION)
             sleep(3)
         except Exception as exc:
             print("DISPLAY_LOOP_ERROR", repr(exc))

@@ -1,6 +1,7 @@
 import time
 import network
 from secrets import WIFI_PASSWORD, WIFI_SSID
+from version import APP_VERSION
 
 
 def connect_wifi(timeout_seconds=30):
@@ -28,7 +29,7 @@ if wlan.isconnected():
     try:
         import ota_updater
 
-        ota_updater.check_for_updates()
+        ota_updater.check_for_updates(current_version=APP_VERSION)
     except Exception as exc:
         print("OTA_ERROR", repr(exc))
 else:
