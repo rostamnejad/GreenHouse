@@ -4,6 +4,7 @@ import time
 DEFAULT_ALERT_COOLDOWN_SECONDS = 600
 DEFAULT_REPORT_INTERVAL_SECONDS = 3600
 DEFAULT_COMMAND_POLL_SECONDS = 20
+DEFAULT_SENSOR_WAIT_NOTICE_SECONDS = 90
 REQUEST_USER_AGENT = "GreenHouse-Telegram"
 TEMP_MIN_C = 18.0
 TEMP_MAX_C = 28.0
@@ -22,6 +23,28 @@ LABEL_TEXT = {
     "humidity_good": "good",
     "humid": "humid",
     "too_humid": "too humid",
+}
+STATE_ICON = {
+    "good": "🟢",
+    "warning": "🟠",
+    "alert": "🔴",
+    "sensor_waiting": "🟡",
+    "sensor_lost": "🔴",
+    "waiting": "⚪",
+}
+LABEL_ICON = {
+    "waiting": "⚪",
+    "too_cold": "🔴",
+    "cold": "🟠",
+    "temp_good": "🟢",
+    "warm": "🟠",
+    "hot": "🔴",
+    "critical_dry": "🔴",
+    "dry": "🟠",
+    "low_humidity": "🟠",
+    "humidity_good": "🟢",
+    "humid": "🟠",
+    "too_humid": "🔴",
 }
 
 
@@ -65,6 +88,14 @@ def _fmt(value, digits=2, empty="--"):
 
 def _label(label):
     return LABEL_TEXT.get(label, label)
+
+
+def _state_icon(state):
+    return STATE_ICON.get(state, "⚪")
+
+
+def _label_icon(label):
+    return LABEL_ICON.get(label, "⚪")
 
 
 def _range_position(value, low, high, unit):
@@ -115,6 +146,19 @@ def _required_actions(parameters):
     return actions if actions else ["Wait for sensor reading."]
 
 
+def _action_lines(parameters):
+    lines = []
+    actions = _required_actions(parameters)
+    for index, action in enumerate(actions):
+        icon = "✅" if action.startswith("No immediate") else "🔧"
+        if action.startswith("Keep"):
+            icon = "✅"
+        if action.startswith("Wait for"):
+            icon = "🟡"
+        lines.append("%d. %s %s" % (index + 1, icon, action))
+    return lines
+
+
 def _effective_state(light):
     if hasattr(light, "effective_label"):
         return light.effective_label()
@@ -142,6 +186,9 @@ class TelegramNotifier:
         self.last_report_ms = time.ticks_ms()
         self.last_state = "waiting"
         self.last_issue_key = ""
+        self.last_sensor_link = None
+        self.sensor_wait_started_ms = time.ticks_ms()
+        self.sensor_wait_notice_sent = False
 
     def _notify(self, event):
         if self.status_callback is None:
@@ -194,6 +241,14 @@ class TelegramNotifier:
                     secrets,
                     "TELEGRAM_COMMAND_POLL_SECONDS",
                     DEFAULT_COMMAND_POLL_SECONDS,
+                )
+            )
+            * 1000,
+            "sensor_wait_notice_ms": int(
+                getattr(
+                    secrets,
+                    "TELEGRAM_SENSOR_WAIT_NOTICE_SECONDS",
+                    DEFAULT_SENSOR_WAIT_NOTICE_SECONDS,
                 )
             )
             * 1000,
@@ -276,23 +331,25 @@ class TelegramNotifier:
         sensor_link = _sensor_link(light)
         sensor_age = _sensor_age(light)
         state = _effective_state(light)
+        state_icon = _state_icon(state)
 
         if sensor_link != "sensor_ok":
             age_text = "--" if sensor_age is None else "%d s" % sensor_age
-            return _pre(
-                "GreenHouse %s\n"
-                "=================\n"
+            return (
+                "%s <b>GreenHouse %s</b>\n"
+                % (state_icon, _html_escape(title))
+            ) + _pre(
                 "State       : %s\n"
                 "Sensor link : %s\n"
                 "Last reading: %s\n"
                 "\n"
-                "REQUIRED ACTION\n"
-                "1. Check sensor board power.\n"
-                "2. Check sensor board WiFi.\n"
-                "3. Reset sensor board if needed.\n"
+                "🔴 SENSOR LINK PROBLEM\n"
+                "1. 🔧 Check sensor board power.\n"
+                "2. 🔧 Check sensor board WiFi.\n"
+                "3. 🔧 Reset sensor board if needed.\n"
                 "\n"
                 "Controller  : v%d"
-                % (title, state.upper(), sensor_link, age_text, self.controller_version)
+                % (state.upper(), sensor_link, age_text, self.controller_version)
             )
 
         time_value = "--:--"
@@ -314,62 +371,75 @@ class TelegramNotifier:
         sensor_version = _value(parameters, "sensor_version")
         temp_value = parameters.get("temp_c")
         humidity_value = parameters.get("humidity")
-        action_lines = _required_actions(parameters)
-        numbered_actions = []
-        for index, action in enumerate(action_lines):
-            numbered_actions.append("%d. %s" % (index + 1, action))
+        temp_icon = _label_icon(light.temperature_label)
+        humidity_icon = _label_icon(light.humidity_label)
+        temp_check = "OK" if light.temperature_label == "temp_good" else "CHECK"
+        humidity_check = (
+            "OK" if light.humidity_label == "humidity_good" else "CHECK"
+        )
+        pressure_icon = "🔵"
+        action_lines = _action_lines(parameters)
 
-        return _pre(
-            "GreenHouse %s\n"
-            "=================\n"
+        return (
+            "%s <b>GreenHouse %s</b>\n"
+            % (state_icon, _html_escape(title))
+        ) + _pre(
             "State       : %s\n"
             "Updated     : %s  %s\n"
             "\n"
-            "TEMPERATURE\n"
+            "%s TEMPERATURE %s\n"
             "Value       : %s C\n"
             "Healthy     : %.0f-%.0f C\n"
-            "Status      : %s\n"
-            "Position    : %s\n"
+            "Status      : %s %s\n"
+            "Position    : %s %s\n"
             "\n"
-            "HUMIDITY\n"
+            "%s HUMIDITY %s\n"
             "Value       : %s %%\n"
             "Healthy     : %.0f-%.0f %%\n"
-            "Status      : %s\n"
-            "Position    : %s\n"
+            "Status      : %s %s\n"
+            "Position    : %s %s\n"
             "\n"
-            "PRESSURE\n"
+            "%s PRESSURE\n"
             "Value       : %s mbar\n"
             "Altitude    : %s m\n"
             "\n"
-            "REQUIRED ACTION\n"
+            "🛠 REQUIRED ACTION\n"
             "%s\n"
             "\n"
             "VERSIONS\n"
             "Controller  : v%d\n"
             "Sensor      : v%s"
             % (
-                title,
                 state.upper(),
                 time_value,
                 date_value,
+                temp_icon,
+                temp_check,
                 _fmt(temp_value),
                 TEMP_MIN_C,
                 TEMP_MAX_C,
+                temp_icon,
                 _label(light.temperature_label),
+                temp_icon,
                 _range_position(temp_value, TEMP_MIN_C, TEMP_MAX_C, "C"),
+                humidity_icon,
+                humidity_check,
                 _fmt(humidity_value),
                 HUMIDITY_MIN_PERCENT,
                 HUMIDITY_MAX_PERCENT,
+                humidity_icon,
                 _label(light.humidity_label),
+                humidity_icon,
                 _range_position(
                     humidity_value,
                     HUMIDITY_MIN_PERCENT,
                     HUMIDITY_MAX_PERCENT,
                     "%",
                 ),
+                pressure_icon,
                 _fmt(parameters.get("pressure_mbar")),
                 _fmt(parameters.get("altitude_m"), 1),
-                "\n".join(numbered_actions),
+                "\n".join(action_lines),
                 self.controller_version,
                 sensor_version,
             )
@@ -392,6 +462,56 @@ class TelegramNotifier:
             self._poll_commands(parameters, light)
         except Exception as exc:
             print("TELEGRAM_COMMAND_ERROR", repr(exc))
+
+    def monitor_sensor_link(self, parameters, light):
+        try:
+            self._monitor_sensor_link(parameters, light)
+        except Exception as exc:
+            print("TELEGRAM_SENSOR_LINK_ERROR", repr(exc))
+
+    def _monitor_sensor_link(self, parameters, light):
+        config = self._config()
+        if config is None:
+            return
+
+        now = time.ticks_ms()
+        sensor_link = _sensor_link(light)
+
+        if self.last_sensor_link is None:
+            self.last_sensor_link = sensor_link
+            if sensor_link == "sensor_waiting":
+                self.sensor_wait_started_ms = now
+            return
+
+        if sensor_link != self.last_sensor_link:
+            previous = self.last_sensor_link
+            self.last_sensor_link = sensor_link
+
+            if sensor_link == "sensor_waiting":
+                self.sensor_wait_started_ms = now
+                self.sensor_wait_notice_sent = False
+                return
+
+            if sensor_link == "sensor_lost":
+                self._send(config, self._message("SENSOR LOST", parameters, light))
+                return
+
+            if sensor_link == "sensor_ok" and previous in (
+                "sensor_lost",
+                "sensor_waiting",
+            ):
+                self.sensor_wait_notice_sent = False
+                self._send(config, self._message("SENSOR CONNECTED", parameters, light))
+                return
+
+        if (
+            sensor_link == "sensor_waiting"
+            and not self.sensor_wait_notice_sent
+            and time.ticks_diff(now, self.sensor_wait_started_ms)
+            >= config["sensor_wait_notice_ms"]
+        ):
+            if self._send(config, self._message("SENSOR WAITING", parameters, light)):
+                self.sensor_wait_notice_sent = True
 
     def _poll_commands(self, parameters, light):
         config = self._config()

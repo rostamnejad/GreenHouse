@@ -14,6 +14,7 @@ RGB_COUNT = 1
 HTTP_PORT = 80
 SEA_LEVEL_PRESSURE_MBAR = 1013.25
 SENSOR_STALE_TIMEOUT_SECONDS = 90
+SENSOR_LINK_CHECK_INTERVAL_MS = 5000
 PARAMETER_KEYS = (
     "temp_c",
     "humidity",
@@ -473,6 +474,7 @@ def main():
     server = make_server()
     last_ota_check_ms = time.ticks_ms()
     last_telegram_poll_ms = time.ticks_ms()
+    last_sensor_link_check_ms = time.ticks_ms()
 
     print("Controller humidity RGB server started VERSION=%d" % APP_VERSION)
     if wlan.isconnected():
@@ -495,6 +497,13 @@ def main():
         ):
             telegram.poll_commands(parameters, light)
             last_telegram_poll_ms = time.ticks_ms()
+
+        if (
+            time.ticks_diff(now_ms, last_sensor_link_check_ms)
+            >= SENSOR_LINK_CHECK_INTERVAL_MS
+        ):
+            telegram.monitor_sensor_link(parameters, light)
+            last_sensor_link_check_ms = time.ticks_ms()
 
         try:
             client, address = server.accept()

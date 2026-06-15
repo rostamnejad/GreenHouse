@@ -34,12 +34,15 @@ RGB climate state:
 
 Telegram notifications:
 - Add `TELEGRAM_ENABLED = True`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_CHAT_ID` to the controller board's local `secrets.py`.
+- Telegram report sections use colored emoji markers: green is healthy, orange needs attention, red needs immediate checking.
 - Telegram sends a warning/alert message when temperature or humidity leaves the healthy range.
 - It sends a recovery message when the greenhouse returns to healthy range.
+- It sends sensor link messages when the sensor board stops sending data or starts sending again.
 - Send `/status` or `/report` to the bot to get the latest controller reading on demand.
 - `TELEGRAM_ALERT_COOLDOWN_SECONDS` controls repeated warning messages; default is 600 seconds.
 - `TELEGRAM_REPORT_INTERVAL_SECONDS` controls healthy periodic reports; default is 3600 seconds. Set it to `0` to disable periodic reports.
 - `TELEGRAM_COMMAND_POLL_SECONDS` controls how often the controller checks bot commands; default is 20 seconds.
+- `TELEGRAM_SENSOR_WAIT_NOTICE_SECONDS` controls the initial no-sensor notice; default is 90 seconds.
 
 Terminal dashboard:
 - From the project root, run:

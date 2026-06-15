@@ -1,16 +1,16 @@
 {
-    "version":  9,
+    "version":  10,
     "device":  "controller",
     "files":  [
                   {
                       "path":  "version.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/version.py",
-                      "sha256":  "0cb6e63ec1d221819c7d29533c1eabc9e63ff61c1c3e2d268ba502e9d7a1647f"
+                      "sha256":  "266439932a48a8304b942c325af8d6bb643ec38315812294fb585270f178f39d"
                   },
                   {
                       "path":  "main.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/main.py",
-                      "sha256":  "8ef645fda205778012c5d9c8c42dbc23b0cfa627d363bcb68ad311c453842d5e"
+                      "sha256":  "b7cf27d0c13989d8bdc048e40d4a241f0375ca50e8b7e1eb6d2926a5589ae6fa"
                   },
                   {
                       "path":  "ota_updater.py",
@@ -20,8 +20,8 @@
                   {
                       "path":  "telegram_notifier.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/telegram_notifier.py",
-                      "sha256":  "e7f8aec2c625770aa7e91018fe84838b17c77ba989d2dac557b17473e281909c"
+                      "sha256":  "8164e127c70a1d01a83d74bf8b3bded606015aee0735cba553de3a904d848622"
                   }
               ],
-    "signature":  "b9dff2a33faf025df16798017bfdaf4f93eb4b933844ce8ae785844e50e52705"
+    "signature":  "45ca41a63142baec25a761a5107fdce18757411e51b108faeca3c50b0385f82a"
 }
