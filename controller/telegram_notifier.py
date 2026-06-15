@@ -115,14 +115,41 @@ def _required_actions(parameters):
     return actions if actions else ["Wait for sensor reading."]
 
 
+def _effective_state(light):
+    if hasattr(light, "effective_label"):
+        return light.effective_label()
+    return light.label
+
+
+def _sensor_link(light):
+    if hasattr(light, "sensor_link_label"):
+        return light.sensor_link_label()
+    return "sensor_ok"
+
+
+def _sensor_age(light):
+    if hasattr(light, "sensor_age_seconds"):
+        return light.sensor_age_seconds()
+    return None
+
+
 class TelegramNotifier:
-    def __init__(self, controller_version):
+    def __init__(self, controller_version, status_callback=None):
         self.controller_version = controller_version
+        self.status_callback = status_callback
         self.disabled_logged = False
         self.last_alert_ms = None
         self.last_report_ms = time.ticks_ms()
         self.last_state = "waiting"
         self.last_issue_key = ""
+
+    def _notify(self, event):
+        if self.status_callback is None:
+            return
+        try:
+            self.status_callback(event)
+        except Exception as exc:
+            print("TELEGRAM_STATUS_CALLBACK_ERROR", repr(exc))
 
     def _config(self):
         try:
@@ -223,13 +250,21 @@ class TelegramNotifier:
             "https://api.telegram.org/bot%s/sendMessage?chat_id=%s&parse_mode=HTML&text=%s"
             % (config["token"], _quote(config["chat_id"]), _quote(text))
         )
-        response = requests.get(url, headers={"User-Agent": REQUEST_USER_AGENT})
+        try:
+            response = requests.get(url, headers={"User-Agent": REQUEST_USER_AGENT})
+        except Exception as exc:
+            print("TELEGRAM_SEND_ERROR", repr(exc))
+            self._notify("failed")
+            return False
+
         try:
             status = getattr(response, "status_code", 200)
             if status == 200:
                 print("TELEGRAM_SEND_OK")
+                self._notify("sent")
                 return True
             print("TELEGRAM_SEND_HTTP", status)
+            self._notify("failed")
         finally:
             try:
                 response.close()
@@ -238,14 +273,26 @@ class TelegramNotifier:
         return False
 
     def _message(self, title, parameters, light):
-        if parameters.get("temp_c") is None and parameters.get("humidity") is None:
+        sensor_link = _sensor_link(light)
+        sensor_age = _sensor_age(light)
+        state = _effective_state(light)
+
+        if sensor_link != "sensor_ok":
+            age_text = "--" if sensor_age is None else "%d s" % sensor_age
             return _pre(
                 "GreenHouse %s\n"
                 "=================\n"
-                "State: WAITING\n"
-                "No sensor reading yet.\n"
-                "Controller v%d"
-                % (title, self.controller_version)
+                "State       : %s\n"
+                "Sensor link : %s\n"
+                "Last reading: %s\n"
+                "\n"
+                "REQUIRED ACTION\n"
+                "1. Check sensor board power.\n"
+                "2. Check sensor board WiFi.\n"
+                "3. Reset sensor board if needed.\n"
+                "\n"
+                "Controller  : v%d"
+                % (title, state.upper(), sensor_link, age_text, self.controller_version)
             )
 
         time_value = "--:--"
@@ -302,7 +349,7 @@ class TelegramNotifier:
             "Sensor      : v%s"
             % (
                 title,
-                light.label.upper(),
+                state.upper(),
                 time_value,
                 date_value,
                 _fmt(temp_value),
@@ -399,6 +446,7 @@ class TelegramNotifier:
 
         now = time.ticks_ms()
         state = light.label
+        state = _effective_state(light)
         issue_key = "%s:%s:%s" % (
             state,
             light.temperature_label,

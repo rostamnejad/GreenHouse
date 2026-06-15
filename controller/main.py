@@ -13,6 +13,7 @@ RGB_PIN = 48
 RGB_COUNT = 1
 HTTP_PORT = 80
 SEA_LEVEL_PRESSURE_MBAR = 1013.25
+SENSOR_STALE_TIMEOUT_SECONDS = 90
 PARAMETER_KEYS = (
     "temp_c",
     "humidity",
@@ -38,6 +39,9 @@ class HumidityLight:
         self.severity = 0
         self.base_color = (40, 40, 40)
         self.updated_ms = time.ticks_ms()
+        self.has_reading = False
+        self.transient_event = ""
+        self.transient_until_ms = 0
         self.off()
 
     def off(self):
@@ -110,8 +114,10 @@ class HumidityLight:
     def set_conditions(self, temp_c=None, humidity=None, log=True):
         if temp_c is not None:
             self.temp_c = temp_c
+            self.has_reading = True
         if humidity is not None:
             self.humidity = humidity
+            self.has_reading = True
         self.updated_ms = time.ticks_ms()
 
         temp_label, temp_severity, temp_color = self._temperature_condition(self.temp_c)
@@ -153,12 +159,54 @@ class HumidityLight:
     def _scale(self, color, level):
         return tuple(int(component * level) for component in color)
 
+    def show_transient(self, event, duration_ms=1500):
+        self.transient_event = event
+        self.transient_until_ms = time.ticks_ms() + duration_ms
+
+    def _animate_transient(self, now):
+        if self.transient_event == "telegram_sent":
+            phase = (now // 130) % 8
+            self.led[0] = (0, 230, 0) if phase in (0, 2, 4, 6) else (0, 0, 0)
+        elif self.transient_event == "telegram_failed":
+            phase = (now // 160) % 6
+            self.led[0] = (220, 0, 0) if phase in (0, 2) else (0, 0, 0)
+        else:
+            self.led[0] = (0, 0, 0)
+
+    def sensor_age_seconds(self):
+        if not self.has_reading:
+            return None
+        return int(time.ticks_diff(time.ticks_ms(), self.updated_ms) / 1000)
+
+    def sensor_link_label(self):
+        if not self.has_reading:
+            return "sensor_waiting"
+        if self.sensor_age_seconds() > SENSOR_STALE_TIMEOUT_SECONDS:
+            return "sensor_lost"
+        return "sensor_ok"
+
+    def effective_label(self):
+        sensor_label = self.sensor_link_label()
+        if sensor_label != "sensor_ok":
+            return sensor_label
+        return self.label
+
+    def _animate_sensor_missing(self, now):
+        phase = (now // 180) % 12
+        if phase in (0, 2):
+            self.led[0] = (220, 0, 0)
+        elif phase in (1, 3):
+            self.led[0] = (0, 0, 0)
+        else:
+            self.led[0] = (18, 0, 0)
+
     def animate(self):
         now = time.ticks_ms()
 
-        if self.temp_c is None and self.humidity is None:
-            pulse = 0.08 + 0.12 * (1 + math.sin(now / 700)) / 2
-            self.led[0] = self._scale((255, 255, 255), pulse)
+        if time.ticks_diff(self.transient_until_ms, now) > 0:
+            self._animate_transient(now)
+        elif self.sensor_link_label() != "sensor_ok":
+            self._animate_sensor_missing(now)
         elif self.label == "alert":
             self.led[0] = self.base_color if (now // 300) % 2 == 0 else (0, 0, 0)
         else:
@@ -272,7 +320,8 @@ def status_body(parameters, light):
 
     return (
         "time=%s jdate=%s temp_c=%s humidity=%s pressure_mbar=%s altitude_m=%s "
-        "controller_version=%d sensor_version=%s temp_state=%s humidity_state=%s state=%s"
+        "controller_version=%d sensor_version=%s temp_state=%s humidity_state=%s "
+        "sensor_link=%s sensor_age_s=%s state=%s"
         % (
             time_value,
             date_value,
@@ -284,7 +333,9 @@ def status_body(parameters, light):
             sensor_version,
             light.temperature_label,
             light.humidity_label,
-            light.label,
+            light.sensor_link_label(),
+            light.sensor_age_seconds(),
+            light.effective_label(),
         )
     )
 
@@ -323,7 +374,10 @@ def print_serial_parameters(parameters, light):
 
     parts.append("TEMP_STATE=%s" % light.temperature_label)
     parts.append("HUMIDITY_STATE=%s" % light.humidity_label)
-    parts.append("STATE=%s" % light.label)
+    parts.append("SENSOR_LINK=%s" % light.sensor_link_label())
+    if light.sensor_age_seconds() is not None:
+        parts.append("SENSOR_AGE_S=%d" % light.sensor_age_seconds())
+    parts.append("STATE=%s" % light.effective_label())
     print("PARAMETERS " + " ".join(parts))
 
 
@@ -376,6 +430,13 @@ def show_activation(light):
         time.sleep_ms(120)
 
 
+def telegram_status(light, event):
+    if event == "sent":
+        light.show_transient("telegram_sent")
+    elif event == "failed":
+        light.show_transient("telegram_failed")
+
+
 def make_server(port=HTTP_PORT):
     server = socket.socket()
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -405,7 +466,10 @@ def main():
     for key in PARAMETER_KEYS:
         parameters[key] = None
 
-    telegram = TelegramNotifier(APP_VERSION)
+    telegram = TelegramNotifier(
+        APP_VERSION,
+        status_callback=lambda event: telegram_status(light, event),
+    )
     server = make_server()
     last_ota_check_ms = time.ticks_ms()
     last_telegram_poll_ms = time.ticks_ms()

@@ -22,9 +22,13 @@ Serial parameter output:
 - `ALTITUDE_M` is a barometric estimate from BMP280 pressure using sea-level pressure `1013.25 mbar`; weather changes can move it.
 
 RGB climate state:
+- Fast green blinks: Telegram message was sent successfully, then RGB returns to the live status mode.
+- Short red blinks: Telegram message send failed.
+- Red double-blink: sensor board is not sending data or the last reading is stale.
 - Green pulse: temperature and humidity are both in the healthy range.
 - Yellow/orange/cyan/blue/purple pulse: warning, mixed from the temperature and humidity issue colors.
 - Red/purple blinking: alert, at least one parameter is far outside the healthy range.
+- Sensor timeout: if no reading arrives for 90 seconds, controller reports `sensor_lost`.
 - Temperature healthy range: 18-28 C.
 - Humidity healthy range: 45-70%.
 
