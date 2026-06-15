@@ -4,6 +4,7 @@
 **/*.bak
 **/*.new
 **/ota_version.txt
+ota_public/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

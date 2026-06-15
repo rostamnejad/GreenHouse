@@ -30,9 +30,14 @@ def _get_config():
     manifest_url = getattr(secrets, "OTA_MANIFEST_URL", "")
     hmac_key = getattr(secrets, "OTA_HMAC_KEY", "")
     device = getattr(secrets, "OTA_DEVICE", "")
+    enabled = getattr(secrets, "OTA_ENABLED", True)
     token = getattr(secrets, "GITHUB_TOKEN", "")
     requires_token = getattr(secrets, "OTA_REQUIRES_TOKEN", False)
     allow_boot = getattr(secrets, "OTA_ALLOW_BOOT_UPDATE", False)
+
+    if not enabled:
+        print("OTA disabled: OTA_ENABLED is False")
+        return None
 
     if not manifest_url or not hmac_key or not device:
         print("OTA disabled: missing OTA_MANIFEST_URL, OTA_HMAC_KEY, or OTA_DEVICE")
