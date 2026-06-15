@@ -3,6 +3,7 @@ import time
 
 DEFAULT_ALERT_COOLDOWN_SECONDS = 600
 DEFAULT_REPORT_INTERVAL_SECONDS = 3600
+DEFAULT_COMMAND_POLL_SECONDS = 20
 REQUEST_USER_AGENT = "GreenHouse-Telegram"
 
 
@@ -88,14 +89,63 @@ class TelegramNotifier:
             )
             * 1000,
             "send_recovery": getattr(secrets, "TELEGRAM_SEND_RECOVERY", True),
+            "command_poll_ms": int(
+                getattr(
+                    secrets,
+                    "TELEGRAM_COMMAND_POLL_SECONDS",
+                    DEFAULT_COMMAND_POLL_SECONDS,
+                )
+            )
+            * 1000,
         }
 
-    def _send(self, config, text):
+    def _requests(self):
         try:
             import urequests as requests
         except ImportError:
             import requests
 
+        return requests
+
+    def _load_json(self, data):
+        try:
+            import ujson as json
+        except ImportError:
+            import json
+
+        if isinstance(data, bytes):
+            data = data.decode()
+        return json.loads(data)
+
+    def _api_get_json(self, config, method, query):
+        requests = self._requests()
+        url = "https://api.telegram.org/bot%s/%s?%s" % (
+            config["token"],
+            method,
+            query,
+        )
+        response = requests.get(url, headers={"User-Agent": REQUEST_USER_AGENT})
+        try:
+            status = getattr(response, "status_code", 200)
+            data = getattr(response, "content", b"")
+            if status != 200:
+                print("TELEGRAM_HTTP", method, status)
+                return None
+
+            payload = self._load_json(data)
+            if not payload.get("ok"):
+                print("TELEGRAM_API_ERROR", method, payload.get("description", ""))
+                return None
+
+            return payload
+        finally:
+            try:
+                response.close()
+            except Exception:
+                pass
+
+    def _send(self, config, text):
+        requests = self._requests()
         url = (
             "https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s"
             % (config["token"], _quote(config["chat_id"]), _quote(text))
@@ -115,6 +165,15 @@ class TelegramNotifier:
         return False
 
     def _message(self, title, parameters, light):
+        if parameters.get("temp_c") is None and parameters.get("humidity") is None:
+            return (
+                "GreenHouse %s\n"
+                "State: WAITING\n"
+                "No sensor reading yet.\n"
+                "Controller v%d"
+                % (title, self.controller_version)
+            )
+
         time_value = "--:--"
         if parameters.get("hour") is not None and parameters.get("minute") is not None:
             time_value = "%02d:%02d" % (parameters["hour"], parameters["minute"])
@@ -173,6 +232,59 @@ class TelegramNotifier:
             self._update(parameters, light)
         except Exception as exc:
             print("TELEGRAM_ERROR", repr(exc))
+
+    def command_poll_interval_ms(self):
+        config = self._config()
+        if config is None:
+            return DEFAULT_COMMAND_POLL_SECONDS * 1000
+        return max(5000, config["command_poll_ms"])
+
+    def poll_commands(self, parameters, light):
+        try:
+            self._poll_commands(parameters, light)
+        except Exception as exc:
+            print("TELEGRAM_COMMAND_ERROR", repr(exc))
+
+    def _poll_commands(self, parameters, light):
+        config = self._config()
+        if config is None:
+            return
+
+        if not hasattr(self, "next_update_id"):
+            self.next_update_id = 0
+
+        query = "timeout=0&limit=5"
+        if self.next_update_id:
+            query += "&offset=%d" % self.next_update_id
+
+        payload = self._api_get_json(config, "getUpdates", query)
+        if payload is None:
+            return
+
+        for update in payload.get("result", []):
+            update_id = update.get("update_id", 0)
+            if update_id >= self.next_update_id:
+                self.next_update_id = update_id + 1
+
+            message = update.get("message") or update.get("edited_message") or {}
+            text = message.get("text", "").strip()
+            chat = message.get("chat", {})
+            chat_id = str(chat.get("id", ""))
+            if not text:
+                continue
+
+            if chat_id != str(config["chat_id"]):
+                print("TELEGRAM_COMMAND_IGNORED_UNAUTHORIZED")
+                continue
+
+            command = text.split()[0].split("@")[0].lower()
+            if command in ("/status", "/report"):
+                self._send(config, self._message("STATUS", parameters, light))
+            elif command in ("/start", "/help"):
+                self._send(
+                    config,
+                    "GreenHouse commands:\n/status - latest greenhouse status",
+                )
 
     def _update(self, parameters, light):
         config = self._config()

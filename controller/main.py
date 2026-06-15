@@ -408,6 +408,7 @@ def main():
     telegram = TelegramNotifier(APP_VERSION)
     server = make_server()
     last_ota_check_ms = time.ticks_ms()
+    last_telegram_poll_ms = time.ticks_ms()
 
     print("Controller humidity RGB server started VERSION=%d" % APP_VERSION)
     if wlan.isconnected():
@@ -423,6 +424,13 @@ def main():
         if time.ticks_diff(now_ms, last_ota_check_ms) >= ota_check_interval_ms():
             check_ota_periodic(light)
             last_ota_check_ms = time.ticks_ms()
+
+        if (
+            time.ticks_diff(now_ms, last_telegram_poll_ms)
+            >= telegram.command_poll_interval_ms()
+        ):
+            telegram.poll_commands(parameters, light)
+            last_telegram_poll_ms = time.ticks_ms()
 
         try:
             client, address = server.accept()
