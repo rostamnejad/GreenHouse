@@ -19,8 +19,14 @@ DISPLAY_BRIGHTNESS = 4
 BEEPER_PIN = 12
 HUMIDITY_LOW_PERCENT = 35
 HUMIDITY_CRITICAL_PERCENT = 30
+TEMP_GOOD_MIN_C = 18
+TEMP_GOOD_MAX_C = 28
+HUMIDITY_GOOD_MIN_PERCENT = 45
+HUMIDITY_GOOD_MAX_PERCENT = 70
 LOW_ALARM_INTERVAL_SECONDS = 12
 CRITICAL_ALARM_INTERVAL_SECONDS = 8
+OK_CHIME_INTERVAL_SECONDS = 120
+OK_CHIME_ON_MS = 25
 TEHRAN_OFFSET_SECONDS = 3 * 3600 + 30 * 60
 TIME_SYNC_INTERVAL_SECONDS = 3600
 CONTROLLER_HOST = "192.168.10.236"
@@ -262,6 +268,7 @@ class HumidityAlarm:
     def __init__(self, pin_number=BEEPER_PIN):
         self.beeper = Pin(pin_number, Pin.OUT, value=0)
         self.last_alarm_ms = 0
+        self.last_ok_chime_ms = time.ticks_ms()
         self.beeper.value(0)
 
     def _pulse(self, count, on_ms, off_ms):
@@ -288,6 +295,21 @@ class HumidityAlarm:
                 self.last_alarm_ms = time.ticks_ms()
         else:
             self.beeper.value(0)
+
+    def update_ok_chime(self, temp_c, humidity):
+        is_good = (
+            TEMP_GOOD_MIN_C <= temp_c <= TEMP_GOOD_MAX_C
+            and HUMIDITY_GOOD_MIN_PERCENT <= humidity <= HUMIDITY_GOOD_MAX_PERCENT
+        )
+        if not is_good:
+            return
+
+        now = time.ticks_ms()
+        interval_ms = OK_CHIME_INTERVAL_SECONDS * 1000
+        if time.ticks_diff(now, self.last_ok_chime_ms) >= interval_ms:
+            print("ENV_OK_CHIME temp=%.2f humidity=%.2f" % (temp_c, humidity))
+            self._pulse(1, OK_CHIME_ON_MS, 0)
+            self.last_ok_chime_ms = time.ticks_ms()
 
     def notify_wifi_connected(self):
         self._pulse(3, 70, 90)
@@ -490,6 +512,7 @@ def main():
             mux.select(SHT20_CHANNEL)
             temp_c, humidity = sensor.read()
             alarm.update(humidity)
+            alarm.update_ok_chime(temp_c, humidity)
 
             mux.select(BMP280_CHANNEL)
             _, pressure_mbar = pressure_sensor.read()
