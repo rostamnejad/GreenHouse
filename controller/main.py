@@ -5,6 +5,7 @@ import time
 import network
 from machine import Pin
 from neopixel import NeoPixel
+from telegram_notifier import TelegramNotifier
 from version import APP_VERSION, OTA_CHECK_INTERVAL_SECONDS
 
 
@@ -404,6 +405,7 @@ def main():
     for key in PARAMETER_KEYS:
         parameters[key] = None
 
+    telegram = TelegramNotifier(APP_VERSION)
     server = make_server()
     last_ota_check_ms = time.ticks_ms()
 
@@ -457,6 +459,7 @@ def main():
 
                 print_serial_parameters(parameters, light)
                 send_response(client, "200 OK", status_body(parameters, light))
+                telegram.update(parameters, light)
         except Exception as exc:
             print("REQUEST_ERROR", repr(exc), "from", address)
             try:

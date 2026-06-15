@@ -28,6 +28,13 @@ RGB climate state:
 - Temperature healthy range: 18-28 C.
 - Humidity healthy range: 45-70%.
 
+Telegram notifications:
+- Add `TELEGRAM_ENABLED = True`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_CHAT_ID` to the controller board's local `secrets.py`.
+- Telegram sends a warning/alert message when temperature or humidity leaves the healthy range.
+- It sends a recovery message when the greenhouse returns to healthy range.
+- `TELEGRAM_ALERT_COOLDOWN_SECONDS` controls repeated warning messages; default is 600 seconds.
+- `TELEGRAM_REPORT_INTERVAL_SECONDS` controls healthy periodic reports; default is 3600 seconds. Set it to `0` to disable periodic reports.
+
 Terminal dashboard:
 - From the project root, run:
   `powershell -ExecutionPolicy Bypass -File .\tools\Read-GreenHouseSerial.ps1`

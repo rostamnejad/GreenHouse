@@ -13,3 +13,11 @@ OTA_REQUIRES_TOKEN = False
 
 # Keep this False unless you deliberately want OTA to replace boot.py.
 OTA_ALLOW_BOOT_UPDATE = False
+
+# Telegram notifications are disabled until you create a bot and fill these.
+TELEGRAM_ENABLED = False
+TELEGRAM_BOT_TOKEN = ""
+TELEGRAM_CHAT_ID = ""
+TELEGRAM_ALERT_COOLDOWN_SECONDS = 600
+TELEGRAM_REPORT_INTERVAL_SECONDS = 3600
+TELEGRAM_SEND_RECOVERY = True
