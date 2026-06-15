@@ -366,6 +366,15 @@ def ota_check_interval_ms():
     return int(seconds * 1000)
 
 
+def show_activation(light):
+    print("RGB activation ready")
+    for _ in range(8):
+        light.show_color((0, 180, 45))
+        time.sleep_ms(120)
+        light.off()
+        time.sleep_ms(120)
+
+
 def make_server(port=HTTP_PORT):
     server = socket.socket()
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -403,6 +412,8 @@ def main():
         print("WiFi OK IP:", wlan.ifconfig()[0])
     else:
         print("WiFi not connected, status:", wlan.status())
+
+    show_activation(light)
 
     while True:
         light.animate()
