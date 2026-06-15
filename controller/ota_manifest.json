@@ -1,11 +1,11 @@
 {
-    "version":  10,
+    "version":  11,
     "device":  "controller",
     "files":  [
                   {
                       "path":  "version.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/version.py",
-                      "sha256":  "266439932a48a8304b942c325af8d6bb643ec38315812294fb585270f178f39d"
+                      "sha256":  "3662b5d9f34e8884dde104b2575fd72b777027132e7ac13356f7b5b5e85c0eb4"
                   },
                   {
                       "path":  "main.py",
@@ -20,8 +20,8 @@
                   {
                       "path":  "telegram_notifier.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/telegram_notifier.py",
-                      "sha256":  "8164e127c70a1d01a83d74bf8b3bded606015aee0735cba553de3a904d848622"
+                      "sha256":  "7a1ada5ab3980d491748a7155fcc9a95ffce7346833d139859f5b8898dc280e8"
                   }
               ],
-    "signature":  "45ca41a63142baec25a761a5107fdce18757411e51b108faeca3c50b0385f82a"
+    "signature":  "f1e00825bd0469a97a9acfb2c4ea9dab54a59cfed2c9911fbbd95a8453110230"
 }

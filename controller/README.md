@@ -34,7 +34,7 @@ RGB climate state:
 
 Telegram notifications:
 - Add `TELEGRAM_ENABLED = True`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_CHAT_ID` to the controller board's local `secrets.py`.
-- Telegram report sections use colored emoji markers: green is healthy, orange needs attention, red needs immediate checking.
+- Telegram report sections use professional Persian text with colored emoji markers: green is healthy, orange needs attention, red needs immediate checking.
 - Telegram sends a warning/alert message when temperature or humidity leaves the healthy range.
 - It sends a recovery message when the greenhouse returns to healthy range.
 - It sends sensor link messages when the sensor board stops sending data or starts sending again.

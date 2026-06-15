@@ -11,18 +11,41 @@ TEMP_MAX_C = 28.0
 HUMIDITY_MIN_PERCENT = 45.0
 HUMIDITY_MAX_PERCENT = 70.0
 LABEL_TEXT = {
-    "waiting": "waiting",
-    "too_cold": "too cold",
-    "cold": "cold",
-    "temp_good": "good",
-    "warm": "warm",
-    "hot": "hot",
-    "critical_dry": "critical dry",
-    "dry": "dry",
-    "low_humidity": "low humidity",
-    "humidity_good": "good",
-    "humid": "humid",
-    "too_humid": "too humid",
+    "waiting": "در انتظار",
+    "too_cold": "خیلی سرد",
+    "cold": "سرد",
+    "temp_good": "مناسب",
+    "warm": "گرم",
+    "hot": "خیلی گرم",
+    "critical_dry": "خشکی بحرانی",
+    "dry": "خشک",
+    "low_humidity": "رطوبت پایین",
+    "humidity_good": "مناسب",
+    "humid": "مرطوب",
+    "too_humid": "رطوبت خیلی بالا",
+}
+STATE_TEXT = {
+    "good": "سالم",
+    "warning": "نیاز به بررسی",
+    "alert": "هشدار جدی",
+    "sensor_waiting": "در انتظار سنسور",
+    "sensor_lost": "ارتباط سنسور قطع است",
+    "waiting": "در انتظار",
+}
+TITLE_TEXT = {
+    "STATUS": "گلخانه - گزارش وضعیت",
+    "REPORT": "گلخانه - گزارش دوره‌ای",
+    "WARNING": "گلخانه - نیاز به بررسی",
+    "ALERT": "گلخانه - هشدار جدی",
+    "RECOVERED": "گلخانه - بازگشت به وضعیت سالم",
+    "SENSOR LOST": "گلخانه - قطع ارتباط سنسور",
+    "SENSOR CONNECTED": "گلخانه - وصل شدن سنسور",
+    "SENSOR WAITING": "گلخانه - در انتظار سنسور",
+}
+SENSOR_LINK_TEXT = {
+    "sensor_ok": "وصل",
+    "sensor_waiting": "در انتظار داده",
+    "sensor_lost": "قطع",
 }
 STATE_ICON = {
     "good": "🟢",
@@ -73,7 +96,7 @@ def _pre(text):
     return "<pre>" + _html_escape(text) + "</pre>"
 
 
-def _value(parameters, key, empty="None"):
+def _value(parameters, key, empty="--"):
     value = parameters.get(key)
     if value is None:
         return empty
@@ -90,6 +113,14 @@ def _label(label):
     return LABEL_TEXT.get(label, label)
 
 
+def _state_text(state):
+    return STATE_TEXT.get(state, state)
+
+
+def _title_text(title):
+    return TITLE_TEXT.get(title, title)
+
+
 def _state_icon(state):
     return STATE_ICON.get(state, "⚪")
 
@@ -100,40 +131,42 @@ def _label_icon(label):
 
 def _range_position(value, low, high, unit):
     if value is None:
-        return "no reading"
+        return "داده‌ای دریافت نشده"
     if value < low:
-        return "%.2f %s below min" % (low - value, unit)
+        return "%.2f %s پایین‌تر از حداقل" % (low - value, unit)
     if value > high:
-        return "%.2f %s above max" % (value - high, unit)
-    return "inside range"
+        return "%.2f %s بالاتر از حداکثر" % (value - high, unit)
+    return "در محدوده سالم"
 
 
-def _value_action(name, value, low, high, unit):
+def _temperature_action(value):
     if value is None:
-        return "Wait for %s reading." % name
-    if value < low:
-        return "Raise %s by about %.1f %s." % (name, low - value, unit)
-    if value > high:
-        return "Reduce %s by about %.1f %s." % (name, value - high, unit)
+        return "منتظر خواندن دما بمان."
+    if value < TEMP_MIN_C:
+        return "دما را حدود %.1f درجه بالا ببر." % (TEMP_MIN_C - value)
+    if value > TEMP_MAX_C:
+        return "دما را حدود %.1f درجه کاهش بده." % (value - TEMP_MAX_C)
+    return ""
+
+
+def _humidity_action(value):
+    if value is None:
+        return "منتظر خواندن رطوبت بمان."
+    if value < HUMIDITY_MIN_PERCENT:
+        return "رطوبت را حدود %.1f درصد بالا ببر." % (
+            HUMIDITY_MIN_PERCENT - value
+        )
+    if value > HUMIDITY_MAX_PERCENT:
+        return "رطوبت را حدود %.1f درصد کاهش بده." % (
+            value - HUMIDITY_MAX_PERCENT
+        )
     return ""
 
 
 def _required_actions(parameters):
     actions = []
-    temp_action = _value_action(
-        "temperature",
-        parameters.get("temp_c"),
-        TEMP_MIN_C,
-        TEMP_MAX_C,
-        "C",
-    )
-    humidity_action = _value_action(
-        "humidity",
-        parameters.get("humidity"),
-        HUMIDITY_MIN_PERCENT,
-        HUMIDITY_MAX_PERCENT,
-        "%",
-    )
+    temp_action = _temperature_action(parameters.get("temp_c"))
+    humidity_action = _humidity_action(parameters.get("humidity"))
 
     for action in (temp_action, humidity_action):
         if action:
@@ -141,19 +174,19 @@ def _required_actions(parameters):
 
     if parameters.get("temp_c") is not None and parameters.get("humidity") is not None:
         if not actions:
-            return ["No immediate action.", "Keep monitoring."]
+            return ["فعلا اقدامی لازم نیست.", "وضعیت را پایش کن."]
 
-    return actions if actions else ["Wait for sensor reading."]
+    return actions if actions else ["منتظر دریافت داده از سنسور بمان."]
 
 
 def _action_lines(parameters):
     lines = []
     actions = _required_actions(parameters)
     for index, action in enumerate(actions):
-        icon = "✅" if action.startswith("No immediate") else "🔧"
-        if action.startswith("Keep"):
+        icon = "🔧"
+        if action.startswith("فعلا") or action.startswith("وضعیت"):
             icon = "✅"
-        if action.startswith("Wait for"):
+        if action.startswith("منتظر"):
             icon = "🟡"
         lines.append("%d. %s %s" % (index + 1, icon, action))
     return lines
@@ -334,22 +367,27 @@ class TelegramNotifier:
         state_icon = _state_icon(state)
 
         if sensor_link != "sensor_ok":
-            age_text = "--" if sensor_age is None else "%d s" % sensor_age
+            age_text = "--" if sensor_age is None else "%d ثانیه قبل" % sensor_age
             return (
-                "%s <b>GreenHouse %s</b>\n"
-                % (state_icon, _html_escape(title))
+                "%s <b>%s</b>\n"
+                % (state_icon, _html_escape(_title_text(title)))
             ) + _pre(
-                "State       : %s\n"
-                "Sensor link : %s\n"
-                "Last reading: %s\n"
+                "وضعیت      : %s\n"
+                "لینک سنسور : %s\n"
+                "آخرین داده : %s\n"
                 "\n"
-                "🔴 SENSOR LINK PROBLEM\n"
-                "1. 🔧 Check sensor board power.\n"
-                "2. 🔧 Check sensor board WiFi.\n"
-                "3. 🔧 Reset sensor board if needed.\n"
+                "🔴 مشکل ارتباط سنسور\n"
+                "1. 🔧 برق برد سنسور را بررسی کن.\n"
+                "2. 🔧 اتصال WiFi برد سنسور را بررسی کن.\n"
+                "3. 🔧 در صورت نیاز برد سنسور را ریست کن.\n"
                 "\n"
-                "Controller  : v%d"
-                % (state.upper(), sensor_link, age_text, self.controller_version)
+                "کنترلر     : v%d"
+                % (
+                    _state_text(state),
+                    SENSOR_LINK_TEXT.get(sensor_link, sensor_link),
+                    age_text,
+                    self.controller_version,
+                )
             )
 
         time_value = "--:--"
@@ -373,44 +411,44 @@ class TelegramNotifier:
         humidity_value = parameters.get("humidity")
         temp_icon = _label_icon(light.temperature_label)
         humidity_icon = _label_icon(light.humidity_label)
-        temp_check = "OK" if light.temperature_label == "temp_good" else "CHECK"
+        temp_check = "مناسب" if light.temperature_label == "temp_good" else "بررسی"
         humidity_check = (
-            "OK" if light.humidity_label == "humidity_good" else "CHECK"
+            "مناسب" if light.humidity_label == "humidity_good" else "بررسی"
         )
         pressure_icon = "🔵"
         action_lines = _action_lines(parameters)
 
         return (
-            "%s <b>GreenHouse %s</b>\n"
-            % (state_icon, _html_escape(title))
+            "%s <b>%s</b>\n"
+            % (state_icon, _html_escape(_title_text(title)))
         ) + _pre(
-            "State       : %s\n"
-            "Updated     : %s  %s\n"
+            "وضعیت      : %s\n"
+            "زمان       : %s  %s\n"
             "\n"
-            "%s TEMPERATURE %s\n"
-            "Value       : %s C\n"
-            "Healthy     : %.0f-%.0f C\n"
-            "Status      : %s %s\n"
-            "Position    : %s %s\n"
+            "%s دما - %s\n"
+            "مقدار      : %s C\n"
+            "محدوده سالم: %.0f-%.0f C\n"
+            "وضعیت      : %s %s\n"
+            "جایگاه     : %s %s\n"
             "\n"
-            "%s HUMIDITY %s\n"
-            "Value       : %s %%\n"
-            "Healthy     : %.0f-%.0f %%\n"
-            "Status      : %s %s\n"
-            "Position    : %s %s\n"
+            "%s رطوبت - %s\n"
+            "مقدار      : %s %%\n"
+            "محدوده سالم: %.0f-%.0f %%\n"
+            "وضعیت      : %s %s\n"
+            "جایگاه     : %s %s\n"
             "\n"
-            "%s PRESSURE\n"
-            "Value       : %s mbar\n"
-            "Altitude    : %s m\n"
+            "%s فشار\n"
+            "مقدار      : %s mbar\n"
+            "ارتفاع     : %s m\n"
             "\n"
-            "🛠 REQUIRED ACTION\n"
+            "🛠 اقدام لازم\n"
             "%s\n"
             "\n"
-            "VERSIONS\n"
-            "Controller  : v%d\n"
-            "Sensor      : v%s"
+            "نسخه‌ها\n"
+            "کنترلر     : v%d\n"
+            "سنسور      : v%s"
             % (
-                state.upper(),
+                _state_text(state),
                 time_value,
                 date_value,
                 temp_icon,
@@ -552,10 +590,11 @@ class TelegramNotifier:
                 self._send(
                     config,
                     _pre(
-                        "GreenHouse commands\n"
-                        "===================\n"
-                        "/status - latest greenhouse report\n"
-                        "/report - same as /status"
+                        "دستورهای ربات گلخانه\n"
+                        "====================\n"
+                        "/status - دریافت آخرین گزارش\n"
+                        "/report - دریافت همان گزارش وضعیت\n"
+                        "/help   - نمایش همین راهنما"
                     ),
                 )
 
