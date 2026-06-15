@@ -5,6 +5,24 @@ DEFAULT_ALERT_COOLDOWN_SECONDS = 600
 DEFAULT_REPORT_INTERVAL_SECONDS = 3600
 DEFAULT_COMMAND_POLL_SECONDS = 20
 REQUEST_USER_AGENT = "GreenHouse-Telegram"
+TEMP_MIN_C = 18.0
+TEMP_MAX_C = 28.0
+HUMIDITY_MIN_PERCENT = 45.0
+HUMIDITY_MAX_PERCENT = 70.0
+LABEL_TEXT = {
+    "waiting": "waiting",
+    "too_cold": "too cold",
+    "cold": "cold",
+    "temp_good": "good",
+    "warm": "warm",
+    "hot": "hot",
+    "critical_dry": "critical dry",
+    "dry": "dry",
+    "low_humidity": "low humidity",
+    "humidity_good": "good",
+    "humid": "humid",
+    "too_humid": "too humid",
+}
 
 
 def _quote(value):
@@ -19,6 +37,19 @@ def _quote(value):
     return "".join(parts)
 
 
+def _html_escape(value):
+    return (
+        str(value)
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+
+
+def _pre(text):
+    return "<pre>" + _html_escape(text) + "</pre>"
+
+
 def _value(parameters, key, empty="None"):
     value = parameters.get(key)
     if value is None:
@@ -26,20 +57,62 @@ def _value(parameters, key, empty="None"):
     return value
 
 
-def _temperature_action(label):
-    if label in ("too_cold", "cold"):
-        return "raise temperature"
-    if label in ("warm", "hot"):
-        return "cool or ventilate"
+def _fmt(value, digits=2, empty="--"):
+    if value is None:
+        return empty
+    return ("%." + str(digits) + "f") % value
+
+
+def _label(label):
+    return LABEL_TEXT.get(label, label)
+
+
+def _range_position(value, low, high, unit):
+    if value is None:
+        return "no reading"
+    if value < low:
+        return "%.2f %s below min" % (low - value, unit)
+    if value > high:
+        return "%.2f %s above max" % (value - high, unit)
+    return "inside range"
+
+
+def _value_action(name, value, low, high, unit):
+    if value is None:
+        return "Wait for %s reading." % name
+    if value < low:
+        return "Raise %s by about %.1f %s." % (name, low - value, unit)
+    if value > high:
+        return "Reduce %s by about %.1f %s." % (name, value - high, unit)
     return ""
 
 
-def _humidity_action(label):
-    if label in ("critical_dry", "dry", "low_humidity"):
-        return "raise humidity"
-    if label in ("humid", "too_humid"):
-        return "reduce humidity or ventilate"
-    return ""
+def _required_actions(parameters):
+    actions = []
+    temp_action = _value_action(
+        "temperature",
+        parameters.get("temp_c"),
+        TEMP_MIN_C,
+        TEMP_MAX_C,
+        "C",
+    )
+    humidity_action = _value_action(
+        "humidity",
+        parameters.get("humidity"),
+        HUMIDITY_MIN_PERCENT,
+        HUMIDITY_MAX_PERCENT,
+        "%",
+    )
+
+    for action in (temp_action, humidity_action):
+        if action:
+            actions.append(action)
+
+    if parameters.get("temp_c") is not None and parameters.get("humidity") is not None:
+        if not actions:
+            return ["No immediate action.", "Keep monitoring."]
+
+    return actions if actions else ["Wait for sensor reading."]
 
 
 class TelegramNotifier:
@@ -147,7 +220,7 @@ class TelegramNotifier:
     def _send(self, config, text):
         requests = self._requests()
         url = (
-            "https://api.telegram.org/bot%s/sendMessage?chat_id=%s&text=%s"
+            "https://api.telegram.org/bot%s/sendMessage?chat_id=%s&parse_mode=HTML&text=%s"
             % (config["token"], _quote(config["chat_id"]), _quote(text))
         )
         response = requests.get(url, headers={"User-Agent": REQUEST_USER_AGENT})
@@ -166,8 +239,9 @@ class TelegramNotifier:
 
     def _message(self, title, parameters, light):
         if parameters.get("temp_c") is None and parameters.get("humidity") is None:
-            return (
+            return _pre(
                 "GreenHouse %s\n"
+                "=================\n"
                 "State: WAITING\n"
                 "No sensor reading yet.\n"
                 "Controller v%d"
@@ -190,38 +264,65 @@ class TelegramNotifier:
                 parameters["jd"],
             )
 
-        actions = []
-        temp_action = _temperature_action(light.temperature_label)
-        humidity_action = _humidity_action(light.humidity_label)
-        if temp_action:
-            actions.append(temp_action)
-        if humidity_action:
-            actions.append(humidity_action)
-        action_text = ", ".join(actions) if actions else "no action needed"
-
         sensor_version = _value(parameters, "sensor_version")
-        return (
+        temp_value = parameters.get("temp_c")
+        humidity_value = parameters.get("humidity")
+        action_lines = _required_actions(parameters)
+        numbered_actions = []
+        for index, action in enumerate(action_lines):
+            numbered_actions.append("%d. %s" % (index + 1, action))
+
+        return _pre(
             "GreenHouse %s\n"
-            "State: %s\n"
-            "Temp: %.2f C (%s)\n"
-            "Humidity: %.2f %% (%s)\n"
-            "Pressure: %.2f mbar\n"
-            "Altitude: %.1f m\n"
-            "Action: %s\n"
-            "Time: %s %s\n"
-            "Controller v%d / Sensor v%s"
+            "=================\n"
+            "State       : %s\n"
+            "Updated     : %s  %s\n"
+            "\n"
+            "TEMPERATURE\n"
+            "Value       : %s C\n"
+            "Healthy     : %.0f-%.0f C\n"
+            "Status      : %s\n"
+            "Position    : %s\n"
+            "\n"
+            "HUMIDITY\n"
+            "Value       : %s %%\n"
+            "Healthy     : %.0f-%.0f %%\n"
+            "Status      : %s\n"
+            "Position    : %s\n"
+            "\n"
+            "PRESSURE\n"
+            "Value       : %s mbar\n"
+            "Altitude    : %s m\n"
+            "\n"
+            "REQUIRED ACTION\n"
+            "%s\n"
+            "\n"
+            "VERSIONS\n"
+            "Controller  : v%d\n"
+            "Sensor      : v%s"
             % (
                 title,
                 light.label.upper(),
-                _value(parameters, "temp_c", 0),
-                light.temperature_label,
-                _value(parameters, "humidity", 0),
-                light.humidity_label,
-                _value(parameters, "pressure_mbar", 0),
-                _value(parameters, "altitude_m", 0),
-                action_text,
                 time_value,
                 date_value,
+                _fmt(temp_value),
+                TEMP_MIN_C,
+                TEMP_MAX_C,
+                _label(light.temperature_label),
+                _range_position(temp_value, TEMP_MIN_C, TEMP_MAX_C, "C"),
+                _fmt(humidity_value),
+                HUMIDITY_MIN_PERCENT,
+                HUMIDITY_MAX_PERCENT,
+                _label(light.humidity_label),
+                _range_position(
+                    humidity_value,
+                    HUMIDITY_MIN_PERCENT,
+                    HUMIDITY_MAX_PERCENT,
+                    "%",
+                ),
+                _fmt(parameters.get("pressure_mbar")),
+                _fmt(parameters.get("altitude_m"), 1),
+                "\n".join(numbered_actions),
                 self.controller_version,
                 sensor_version,
             )
@@ -283,7 +384,12 @@ class TelegramNotifier:
             elif command in ("/start", "/help"):
                 self._send(
                     config,
-                    "GreenHouse commands:\n/status - latest greenhouse status",
+                    _pre(
+                        "GreenHouse commands\n"
+                        "===================\n"
+                        "/status - latest greenhouse report\n"
+                        "/report - same as /status"
+                    ),
                 )
 
     def _update(self, parameters, light):
