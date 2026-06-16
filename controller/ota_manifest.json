@@ -1,26 +1,31 @@
 {
-    "version":  20,
+    "version":  21,
     "device":  "controller",
     "files":  [
                   {
                       "path":  "version.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/version.py",
-                      "sha256":  "8a902b8c1fb2c36dd312c2ff3b3063625d6f77748d75a8f38caba0686b6e886e"
+                      "sha256":  "8c37076a48db82ffcd545091f0bf524752f7824962d524ff8fd048cbe9e79cdb"
                   },
                   {
                       "path":  "main.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/main.py",
-                      "sha256":  "8010174fe3d6b92580d96c675fd7b90b3cebcd2c02f0dd9ecb63c5755f60149b"
+                      "sha256":  "ee3954e8f19ebe45f0a99539a5ad5b31966ac55d37b2ed5b9bf58248ffbddc66"
+                  },
+                  {
+                      "path":  "net_http.py",
+                      "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/net_http.py",
+                      "sha256":  "9f6582f8dd666794460cb87627d4d1f1e4a758d9c4f57c2fff2b6e54d4f79f0e"
                   },
                   {
                       "path":  "ota_updater.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/ota_updater.py",
-                      "sha256":  "5b3ba9bac63970890c46c39a86aafc93e42ae42da2c39aea91a56267e4617f67"
+                      "sha256":  "0f73def3b4b9b8b0a8ab27ae4125185d5a049dd7e1d077ca9e10539154d4243c"
                   },
                   {
                       "path":  "telegram_notifier.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/telegram_notifier.py",
-                      "sha256":  "087fe75e082ed46e258d82a77032326359fc312dfc0c316ca5be5c9c1cd39689"
+                      "sha256":  "edd58c816b24f738511b9d2cf3978ac72a5b611dc0aa3790011e73122305555d"
                   },
                   {
                       "path":  "ssd1306.py",
@@ -33,5 +38,5 @@
                       "sha256":  "8097d6b5939b406af0439950c2c16b853bfe302306005f78ee39445785e2c1ae"
                   }
               ],
-    "signature":  "65ef9a13ebe9cec9108e63c35a213b4b13ae2a1a97543eceeee47405baeb17ef"
+    "signature":  "83b462bf5f22fc4beec26293e65922fba736e9402fd0ab9b77547cf56b25b755"
 }

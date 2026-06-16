@@ -34,6 +34,7 @@ if ($Files.Count -eq 0) {
         $Files = @(
             "version.py",
             "main.py",
+            "net_http.py",
             "ota_updater.py",
             "telegram_notifier.py",
             "ssd1306.py",

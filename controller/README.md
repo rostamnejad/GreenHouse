@@ -43,7 +43,7 @@ OLED status display:
 - `GET /status` includes `temp_color`, `humidity_color`, `soil_color`, and `status_color` as RGB values for a color UI.
 - Recommended wiring:
   `GND -> GND`, `VCC -> 3V3`, `D0 -> GPIO12`, `D1 -> GPIO11`, `RES -> GPIO9`, `DC -> GPIO10`, `CS -> GPIO8`.
-- Upload `ssd1306.py` and `oled_display.py` to the controller board along with `main.py`.
+- Upload `net_http.py`, `ssd1306.py`, and `oled_display.py` to the controller board along with `main.py` when installing manually.
 - Change the `OLED_*` values in local `secrets.py` if you use different pins.
 - Set `OLED_ENABLED = False` to run without the display.
 
@@ -65,6 +65,7 @@ Telegram notifications:
 - `TELEGRAM_REPORT_INTERVAL_SECONDS` controls healthy periodic reports; default is 3600 seconds. Set it to `0` to disable periodic reports.
 - `TELEGRAM_COMMAND_POLL_SECONDS` controls how often the controller checks bot commands; default is 20 seconds.
 - `TELEGRAM_SENSOR_WAIT_NOTICE_SECONDS` controls the initial no-sensor notice; default is 90 seconds.
+- Telegram and OTA network calls have short timeouts so they cannot freeze the controller loop when internet, Telegram, or GitHub is slow.
 
 Terminal dashboard:
 - From the project root, run:

@@ -1,10 +1,14 @@
 import time
 
+import net_http
+
 
 DEFAULT_ALERT_COOLDOWN_SECONDS = 600
 DEFAULT_REPORT_INTERVAL_SECONDS = 3600
 DEFAULT_COMMAND_POLL_SECONDS = 20
 DEFAULT_SENSOR_WAIT_NOTICE_SECONDS = 90
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 5
+DEFAULT_FAILURE_BACKOFF_SECONDS = 60
 REQUEST_USER_AGENT = "GreenHouse-Telegram"
 TEMP_MIN_C = 18.0
 TEMP_MAX_C = 28.0
@@ -249,6 +253,7 @@ class TelegramNotifier:
         self.last_sensor_link = None
         self.sensor_wait_started_ms = time.ticks_ms()
         self.sensor_wait_notice_sent = False
+        self.network_backoff_until_ms = 0
 
     def _notify(self, event):
         if self.status_callback is None:
@@ -312,15 +317,22 @@ class TelegramNotifier:
                 )
             )
             * 1000,
+            "request_timeout_s": int(
+                getattr(
+                    secrets,
+                    "TELEGRAM_REQUEST_TIMEOUT_SECONDS",
+                    DEFAULT_REQUEST_TIMEOUT_SECONDS,
+                )
+            ),
+            "failure_backoff_ms": int(
+                getattr(
+                    secrets,
+                    "TELEGRAM_FAILURE_BACKOFF_SECONDS",
+                    DEFAULT_FAILURE_BACKOFF_SECONDS,
+                )
+            )
+            * 1000,
         }
-
-    def _requests(self):
-        try:
-            import urequests as requests
-        except ImportError:
-            import requests
-
-        return requests
 
     def _load_json(self, data):
         try:
@@ -332,26 +344,55 @@ class TelegramNotifier:
             data = data.decode()
         return json.loads(data)
 
+    def _in_network_backoff(self):
+        return time.ticks_diff(self.network_backoff_until_ms, time.ticks_ms()) > 0
+
+    def _start_network_backoff(self, config):
+        self.network_backoff_until_ms = time.ticks_add(
+            time.ticks_ms(), config["failure_backoff_ms"]
+        )
+
+    def _clear_network_backoff(self):
+        self.network_backoff_until_ms = 0
+
+    def _get(self, url, headers, timeout_seconds):
+        return net_http.get(url, headers=headers, timeout=timeout_seconds)
+
     def _api_get_json(self, config, method, query):
-        requests = self._requests()
+        if self._in_network_backoff():
+            return None
+
         url = "https://api.telegram.org/bot%s/%s?%s" % (
             config["token"],
             method,
             query,
         )
-        response = requests.get(url, headers={"User-Agent": REQUEST_USER_AGENT})
+        try:
+            response = self._get(
+                url,
+                {"User-Agent": REQUEST_USER_AGENT},
+                config["request_timeout_s"],
+            )
+        except Exception as exc:
+            print("TELEGRAM_HTTP_ERROR", method, repr(exc))
+            self._start_network_backoff(config)
+            return None
+
         try:
             status = getattr(response, "status_code", 200)
             data = getattr(response, "content", b"")
             if status != 200:
                 print("TELEGRAM_HTTP", method, status)
+                self._start_network_backoff(config)
                 return None
 
             payload = self._load_json(data)
             if not payload.get("ok"):
                 print("TELEGRAM_API_ERROR", method, payload.get("description", ""))
+                self._start_network_backoff(config)
                 return None
 
+            self._clear_network_backoff()
             return payload
         finally:
             try:
@@ -360,15 +401,22 @@ class TelegramNotifier:
                 pass
 
     def _send(self, config, text):
-        requests = self._requests()
+        if self._in_network_backoff():
+            return False
+
         url = (
             "https://api.telegram.org/bot%s/sendMessage?chat_id=%s&parse_mode=HTML&text=%s"
             % (config["token"], _quote(config["chat_id"]), _quote(text))
         )
         try:
-            response = requests.get(url, headers={"User-Agent": REQUEST_USER_AGENT})
+            response = self._get(
+                url,
+                {"User-Agent": REQUEST_USER_AGENT},
+                config["request_timeout_s"],
+            )
         except Exception as exc:
             print("TELEGRAM_SEND_ERROR", repr(exc))
+            self._start_network_backoff(config)
             self._notify("failed")
             return False
 
@@ -376,9 +424,11 @@ class TelegramNotifier:
             status = getattr(response, "status_code", 200)
             if status == 200:
                 print("TELEGRAM_SEND_OK")
+                self._clear_network_backoff()
                 self._notify("sent")
                 return True
             print("TELEGRAM_SEND_HTTP", status)
+            self._start_network_backoff(config)
             self._notify("failed")
         finally:
             try:

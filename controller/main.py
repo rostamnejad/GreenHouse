@@ -26,6 +26,7 @@ SENSOR_LINK_CHECK_INTERVAL_MS = 5000
 WIFI_RECONNECT_INTERVAL_MS = 15000
 WIFI_CONNECT_TIMEOUT_MS = 10000
 OTA_STARTUP_DELAY_MS = 15000
+HTTP_CLIENT_TIMEOUT_SECONDS = 2
 PARAMETER_KEYS = (
     "temp_c",
     "humidity",
@@ -767,6 +768,11 @@ def main():
             continue
 
         try:
+            try:
+                client.settimeout(HTTP_CLIENT_TIMEOUT_SECONDS)
+            except Exception:
+                pass
+
             request = client.recv(512).decode()
             path = parse_request_path(request)
             new_parameters = parse_parameters(path)

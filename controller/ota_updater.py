@@ -1,5 +1,7 @@
 import os
 
+import net_http
+
 try:
     import ujson as json
 except ImportError:
@@ -19,6 +21,7 @@ except ImportError:
 STATE_FILE = "ota_version.txt"
 CHUNK_SIZE = 1024
 BLOCK_SIZE = 64
+DEFAULT_REQUEST_TIMEOUT_SECONDS = 8
 
 
 def _get_config():
@@ -34,6 +37,9 @@ def _get_config():
     token = getattr(secrets, "GITHUB_TOKEN", "")
     requires_token = getattr(secrets, "OTA_REQUIRES_TOKEN", False)
     allow_boot = getattr(secrets, "OTA_ALLOW_BOOT_UPDATE", False)
+    request_timeout_s = int(
+        getattr(secrets, "OTA_REQUEST_TIMEOUT_SECONDS", DEFAULT_REQUEST_TIMEOUT_SECONDS)
+    )
 
     if not enabled:
         print("OTA disabled: OTA_ENABLED is False")
@@ -53,6 +59,7 @@ def _get_config():
         "device": device,
         "token": token,
         "allow_boot": allow_boot,
+        "request_timeout_s": request_timeout_s,
     }
 
 
@@ -114,17 +121,16 @@ def _decode_github_content_api(data):
     return binascii.a2b_base64(payload["content"])
 
 
-def _request(url, token=""):
-    try:
-        import urequests as requests
-    except ImportError:
-        import requests
+def _get(url, headers, timeout_seconds):
+    return net_http.get(url, headers=headers, timeout=timeout_seconds)
 
+
+def _request(url, token="", timeout_seconds=DEFAULT_REQUEST_TIMEOUT_SECONDS):
     headers = {"User-Agent": "GreenHouse-OTA"}
     if token:
         headers["Authorization"] = "Bearer " + token
 
-    response = requests.get(url, headers=headers)
+    response = _get(url, headers, timeout_seconds)
     try:
         status = getattr(response, "status_code", 200)
         if status != 200:
@@ -212,12 +218,12 @@ def _sha256_file_hex(path):
     return _hex_digest(digest.digest())
 
 
-def _stage_file(file_info, token):
+def _stage_file(file_info, token, timeout_seconds):
     path = file_info["path"]
     tmp_path = path + ".new"
     _ensure_parent_dir(path)
 
-    data = _request(file_info["url"], token)
+    data = _request(file_info["url"], token, timeout_seconds)
     with open(tmp_path, "wb") as file:
         file.write(data)
 
@@ -252,7 +258,9 @@ def check_for_updates(current_version=0, status_callback=None):
     local_version = get_current_version(current_version)
     _notify(status_callback, "checking", local_version)
 
-    manifest_bytes = _request(config["manifest_url"], config["token"])
+    manifest_bytes = _request(
+        config["manifest_url"], config["token"], config["request_timeout_s"]
+    )
     manifest = json.loads(manifest_bytes.decode())
 
     if manifest.get("device") != config["device"]:
@@ -290,7 +298,7 @@ def check_for_updates(current_version=0, status_callback=None):
             remote_version,
             file_info.get("path", ""),
         )
-        _stage_file(file_info, config["token"])
+        _stage_file(file_info, config["token"], config["request_timeout_s"])
 
     for file_info in files:
         _notify(
