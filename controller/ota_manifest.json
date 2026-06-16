@@ -1,16 +1,16 @@
 {
-    "version":  11,
+    "version":  12,
     "device":  "controller",
     "files":  [
                   {
                       "path":  "version.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/version.py",
-                      "sha256":  "3662b5d9f34e8884dde104b2575fd72b777027132e7ac13356f7b5b5e85c0eb4"
+                      "sha256":  "ca6ab9a47312f07c9d0fe8aeae35b0dfcdaaf518b1c1a776ada17f6a08b1f88d"
                   },
                   {
                       "path":  "main.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/main.py",
-                      "sha256":  "b7cf27d0c13989d8bdc048e40d4a241f0375ca50e8b7e1eb6d2926a5589ae6fa"
+                      "sha256":  "84891bc93b173c99b80fc6aa68306dc35f1bac52a194755afff050759a899fb7"
                   },
                   {
                       "path":  "ota_updater.py",
@@ -21,7 +21,17 @@
                       "path":  "telegram_notifier.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/telegram_notifier.py",
                       "sha256":  "7a1ada5ab3980d491748a7155fcc9a95ffce7346833d139859f5b8898dc280e8"
+                  },
+                  {
+                      "path":  "ssd1306.py",
+                      "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/ssd1306.py",
+                      "sha256":  "ec84e5494eaeb2e129e213014095f3166cda11e2516ae4fbc805f45dda9df394"
+                  },
+                  {
+                      "path":  "oled_display.py",
+                      "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/oled_display.py",
+                      "sha256":  "b6ce5f83031a4f6f260537058683f48dee5fcb1fa3e075c75270aef088917d7b"
                   }
               ],
-    "signature":  "f1e00825bd0469a97a9acfb2c4ea9dab54a59cfed2c9911fbbd95a8453110230"
+    "signature":  "69ebf12c321691c62ca137a07aaeff87f08e24b84511609a14f1927ad6f3a7a7"
 }

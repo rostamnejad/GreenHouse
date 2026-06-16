@@ -32,6 +32,15 @@ RGB climate state:
 - Temperature healthy range: 18-28 C.
 - Humidity healthy range: 45-70%.
 
+OLED status display:
+- The controller supports a 0.96 inch SSD1306 SPI OLED with pins labeled `GND VCC D0 D1 RES DC CS`.
+- The OLED shows only the latest temperature and humidity values.
+- Recommended wiring:
+  `GND -> GND`, `VCC -> 3V3`, `D0 -> GPIO12`, `D1 -> GPIO11`, `RES -> GPIO9`, `DC -> GPIO10`, `CS -> GPIO8`.
+- Upload `ssd1306.py` and `oled_display.py` to the controller board along with `main.py`.
+- Change the `OLED_*` values in local `secrets.py` if you use different pins.
+- Set `OLED_ENABLED = False` to run without the display.
+
 Telegram notifications:
 - Add `TELEGRAM_ENABLED = True`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_CHAT_ID` to the controller board's local `secrets.py`.
 - Telegram report sections use professional Persian text with colored emoji markers: green is healthy, orange needs attention, red needs immediate checking.

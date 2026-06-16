@@ -8,6 +8,14 @@ from neopixel import NeoPixel
 from telegram_notifier import TelegramNotifier
 from version import APP_VERSION, OTA_CHECK_INTERVAL_SECONDS
 
+try:
+    from oled_display import OledStatusDisplay
+except Exception as exc:
+    OledStatusDisplay = None
+    OLED_IMPORT_ERROR = exc
+else:
+    OLED_IMPORT_ERROR = None
+
 
 RGB_PIN = 48
 RGB_COUNT = 1
@@ -438,6 +446,18 @@ def telegram_status(light, event):
         light.show_transient("telegram_failed")
 
 
+def make_display(app_version):
+    if OledStatusDisplay is None:
+        print("OLED_IMPORT_ERROR", repr(OLED_IMPORT_ERROR))
+        return None
+    return OledStatusDisplay(app_version)
+
+
+def update_display(display, parameters, light, force=False):
+    if display is not None:
+        display.update(parameters, light, force=force)
+
+
 def make_server(port=HTTP_PORT):
     server = socket.socket()
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -466,6 +486,7 @@ def main():
     parameters = {}
     for key in PARAMETER_KEYS:
         parameters[key] = None
+    display = make_display(APP_VERSION)
 
     telegram = TelegramNotifier(
         APP_VERSION,
@@ -479,13 +500,19 @@ def main():
     print("Controller humidity RGB server started VERSION=%d" % APP_VERSION)
     if wlan.isconnected():
         print("WiFi OK IP:", wlan.ifconfig()[0])
+        if display is not None:
+            display.show_message("WiFi OK", wlan.ifconfig()[0])
     else:
         print("WiFi not connected, status:", wlan.status())
+        if display is not None:
+            display.show_message("WiFi error", "status %s" % wlan.status())
 
     show_activation(light)
+    update_display(display, parameters, light, force=True)
 
     while True:
         light.animate()
+        update_display(display, parameters, light)
         now_ms = time.ticks_ms()
         if time.ticks_diff(now_ms, last_ota_check_ms) >= ota_check_interval_ms():
             check_ota_periodic(light)
@@ -538,6 +565,7 @@ def main():
                         log=False,
                     )
 
+                update_display(display, parameters, light, force=True)
                 print_serial_parameters(parameters, light)
                 send_response(client, "200 OK", status_body(parameters, light))
                 telegram.update(parameters, light)

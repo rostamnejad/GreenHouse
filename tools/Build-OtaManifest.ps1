@@ -13,7 +13,7 @@ param(
 
     [switch]$UseGitHubApi,
 
-    [string[]]$Files = @("version.py", "main.py", "ota_updater.py")
+    [string[]]$Files = @()
 )
 
 Set-StrictMode -Version Latest
@@ -27,6 +27,21 @@ if (-not $key) {
 $deviceDir = Join-Path (Get-Location) $Device
 if (-not (Test-Path $deviceDir)) {
     throw "Device directory not found: $deviceDir"
+}
+
+if ($Files.Count -eq 0) {
+    if ($Device -eq "controller") {
+        $Files = @(
+            "version.py",
+            "main.py",
+            "ota_updater.py",
+            "telegram_notifier.py",
+            "ssd1306.py",
+            "oled_display.py"
+        )
+    } else {
+        $Files = @("version.py", "main.py", "ota_updater.py")
+    }
 }
 
 $base = $RawBaseUrl.TrimEnd("/")

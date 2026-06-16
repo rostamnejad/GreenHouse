@@ -16,7 +16,17 @@ if (-not $key) {
 
 $root = Get-Location
 $outputRoot = Join-Path $root $OutputDir
-$files = @("version.py", "main.py", "ota_updater.py")
+$filesByDevice = @{
+    controller = @(
+        "version.py",
+        "main.py",
+        "ota_updater.py",
+        "telegram_notifier.py",
+        "ssd1306.py",
+        "oled_display.py"
+    )
+    sensors = @("version.py", "main.py", "ota_updater.py")
+}
 
 if (Test-Path $outputRoot) {
     Remove-Item -LiteralPath $outputRoot -Recurse -Force
@@ -27,6 +37,7 @@ New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 foreach ($device in @("controller", "sensors")) {
     $deviceOut = Join-Path $outputRoot $device
     New-Item -ItemType Directory -Force -Path $deviceOut | Out-Null
+    $files = $filesByDevice[$device]
 
     foreach ($file in $files) {
         Copy-Item -LiteralPath (Join-Path $root "$device\$file") -Destination (Join-Path $deviceOut $file)
@@ -37,7 +48,8 @@ foreach ($device in @("controller", "sensors")) {
     powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root "tools\Build-OtaManifest.ps1") `
         -Device $device `
         -Version $Version `
-        -RawBaseUrl $rawBaseUrl | Out-Null
+        -RawBaseUrl $rawBaseUrl `
+        -Files $files | Out-Null
 
     Move-Item -LiteralPath (Join-Path $root "$device\ota_manifest.json") -Destination (Join-Path $deviceOut "ota_manifest.json") -Force
 }
