@@ -1,11 +1,11 @@
 {
-    "version":  18,
+    "version":  19,
     "device":  "controller",
     "files":  [
                   {
                       "path":  "version.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/version.py",
-                      "sha256":  "47cb9fd65a8dddd3093083ed697f918694abd5d212a4f3a7994a5ae5e5037488"
+                      "sha256":  "2bd1e5bdf3c150c9f8411589b6847676a3e4f773fe08d9772368c0da83a8524b"
                   },
                   {
                       "path":  "main.py",
@@ -30,8 +30,8 @@
                   {
                       "path":  "oled_display.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/oled_display.py",
-                      "sha256":  "d871bd47fea1fade11d04e0cade633290b223d0ef4ea0f43b782685e41e9164e"
+                      "sha256":  "d23b92a6e2367d030527805de6eaa0fc5cc2a8ed18bc7879df101d73b679f18d"
                   }
               ],
-    "signature":  "494de4ab2323aee10b9f90b4a811c87af392f3e7a73edbe072ec8f49c9b72e6d"
+    "signature":  "5a152b0b7d082b9a5cedc361a809222ce8c94bb7127be50b623e106ba173edd6"
 }

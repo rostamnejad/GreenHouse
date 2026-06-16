@@ -177,12 +177,8 @@ class OledStatusDisplay:
         return "WAIT"
 
     def _metric_row(self, row, name, value, level="OK", now_ms=0):
-        text = "%s %s" % (name, value)
-        if level == "ALERT":
-            invert = (now_ms // 500) % 2 == 0
-            self._row(row, text, invert)
-            return
-        self._row(row, text, level == "WARN")
+        marker = "." if level in ("WARN", "ALERT") else " "
+        self._row(row, "%s %-6s %s" % (name, value, marker))
 
     def _temp_level(self, light):
         return self._condition_level(
