@@ -176,9 +176,21 @@ class OledStatusDisplay:
             return "WARN"
         return "WAIT"
 
+    def _status_dot(self, row, level="OK", now_ms=0):
+        if level == "WARN":
+            x = self.display.width - 5
+            y = row * 8 + 3
+            self.display.fill_rect(x, y, 2, 2, 1)
+        elif level == "ALERT":
+            if (now_ms // 350) % 2 == 1:
+                return
+            x = self.display.width - 6
+            y = row * 8 + 2
+            self.display.fill_rect(x, y, 4, 4, 1)
+
     def _metric_row(self, row, name, value, level="OK", now_ms=0):
-        marker = "." if level in ("WARN", "ALERT") else " "
-        self._row(row, "%s %-6s %s" % (name, value, marker))
+        self._row(row, "%s %-7s" % (name, value))
+        self._status_dot(row, level, now_ms)
 
     def _temp_level(self, light):
         return self._condition_level(

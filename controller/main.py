@@ -448,6 +448,10 @@ def pressure_to_altitude_m(pressure_mbar):
     return 44330 * (1 - (pressure_mbar / SEA_LEVEL_PRESSURE_MBAR) ** 0.1903)
 
 
+def rgb_text(color):
+    return "%d,%d,%d" % color
+
+
 def status_body(parameters, light):
     time_value = "--:--"
     if parameters["hour"] is not None and parameters["minute"] is not None:
@@ -502,7 +506,8 @@ def status_body(parameters, light):
         "time=%s jdate=%s temp_c=%s humidity=%s soil_moisture=%s soil_raw=%s "
         "pressure_mbar=%s altitude_m=%s "
         "controller_version=%d sensor_version=%s temp_state=%s humidity_state=%s "
-        "soil_state=%s sensor_link=%s sensor_age_s=%s state=%s"
+        "soil_state=%s temp_color=%s humidity_color=%s soil_color=%s status_color=%s "
+        "sensor_link=%s sensor_age_s=%s state=%s"
         % (
             time_value,
             date_value,
@@ -517,6 +522,10 @@ def status_body(parameters, light):
             light.temperature_label,
             light.humidity_label,
             light.soil_label,
+            rgb_text(light.temp_color),
+            rgb_text(light.humidity_color),
+            rgb_text(light.soil_color),
+            rgb_text(light.base_color),
             light.sensor_link_label(),
             light.sensor_age_seconds(),
             light.effective_label(),

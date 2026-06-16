@@ -28,8 +28,8 @@ RGB climate state:
 - Green pulse: temperature and humidity are both in the healthy range.
 - Temperature and humidity use independent RGB status colors.
 - Temperature: cold is blue/cyan, warm is orange, hot is red.
-- Humidity: low/dry is orange/red, humid is blue, too humid is purple.
-- Soil moisture: dry is orange/red, too wet is purple/blue.
+- Humidity: warning dry/low/high is yellow, critical dry or too humid is red.
+- Soil moisture: wet warning is yellow, dry/critical/too wet is red.
 - If multiple readings need attention, the RGB alternates between their independent colors.
 - Critical temperature, humidity, or soil moisture blinks its own color.
 - Sensor timeout: if no reading arrives for 90 seconds, controller reports `sensor_lost`.
@@ -39,7 +39,8 @@ RGB climate state:
 OLED status display:
 - The controller supports a 0.96 inch SSD1306 SPI OLED with pins labeled `GND VCC D0 D1 RES DC CS`.
 - The OLED shows startup/connectivity steps, then a compact live status page for temperature, air humidity, soil moisture, pressure, and state.
-- The OLED is monochrome, so warning/error rows stay plain and show a `.` marker beside the affected value.
+- The OLED is monochrome, so it cannot draw RGB colors. Warning/error rows stay plain and show a status dot beside the affected value: warning is a small steady dot and alert is a larger blinking dot.
+- `GET /status` includes `temp_color`, `humidity_color`, `soil_color`, and `status_color` as RGB values for a color UI.
 - Recommended wiring:
   `GND -> GND`, `VCC -> 3V3`, `D0 -> GPIO12`, `D1 -> GPIO11`, `RES -> GPIO9`, `DC -> GPIO10`, `CS -> GPIO8`.
 - Upload `ssd1306.py` and `oled_display.py` to the controller board along with `main.py`.
