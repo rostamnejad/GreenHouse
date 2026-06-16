@@ -171,15 +171,18 @@ class OledStatusDisplay:
         if label == good_label:
             return "OK"
         if label in alert_labels:
-            return "RED"
+            return "ALERT"
         if label in warning_labels:
-            return "YEL"
+            return "WARN"
         return "WAIT"
 
-    def _metric_row(self, row, name, value, level="OK"):
-        issue = level in ("YEL", "RED")
-        text = "%s %-6s %s" % (name, value, level)
-        self._row(row, text, issue)
+    def _metric_row(self, row, name, value, level="OK", now_ms=0):
+        text = "%s %s" % (name, value)
+        if level == "ALERT":
+            invert = (now_ms // 500) % 2 == 0
+            self._row(row, text, invert)
+            return
+        self._row(row, text, level == "WARN")
 
     def _temp_level(self, light):
         return self._condition_level(
@@ -254,13 +257,19 @@ class OledStatusDisplay:
             self._line(0, "%s v%d" % (self._time_text(now), self.app_version), 0)
             self._row(1, self._date_text(parameters))
             self.display.hline(0, 17, self.display.width, 1)
-            self._metric_row(3, "TEMP", "%sC" % temp, self._temp_level(light))
-            self._metric_row(4, "AIR", "%s%%" % humidity, self._humidity_level(light))
-            self._metric_row(5, "SOIL", "%s%%" % soil, self._soil_level(light))
+            self._metric_row(3, "TEMP", "%sC" % temp, self._temp_level(light), now)
+            self._metric_row(
+                4, "AIR", "%s%%" % humidity, self._humidity_level(light), now
+            )
+            self._metric_row(5, "SOIL", "%s%%" % soil, self._soil_level(light), now)
             self._row(6, "P %smbar" % pressure)
             if link_issue:
                 self._metric_row(
-                    7, "LINK", self._short_label(light.sensor_link_label()), "RED"
+                    7,
+                    "LINK",
+                    self._short_label(light.sensor_link_label()),
+                    "ALERT",
+                    now,
                 )
             else:
                 self._row(7, "STATE %s" % self._short_label(light.effective_label()))
