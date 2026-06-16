@@ -73,7 +73,8 @@ Terminal dashboard:
 
 OTA updates from GitHub:
 - `boot.py` connects to WiFi, then calls `ota_updater.check_for_updates()`.
-- `main.py` also checks for updates every `OTA_CHECK_INTERVAL_SECONDS` seconds; default is 300 seconds.
+- `main.py` reconnects WiFi if needed and also checks for updates shortly after startup, then every `OTA_CHECK_INTERVAL_SECONDS` seconds; default is 300 seconds.
+- To force an OTA check without pressing reset, open `http://<controller-ip>/ota`.
 - OTA is disabled until `OTA_DEVICE`, `OTA_MANIFEST_URL`, and `OTA_HMAC_KEY` are added to the board's local `secrets.py`.
 - The board verifies the HMAC-signed manifest and SHA256 of every downloaded file before installing.
 - Every firmware release should bump `version.py` and the OTA manifest `version` to the same number.

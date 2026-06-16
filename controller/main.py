@@ -23,6 +23,9 @@ HTTP_PORT = 80
 SEA_LEVEL_PRESSURE_MBAR = 1013.25
 SENSOR_STALE_TIMEOUT_SECONDS = 90
 SENSOR_LINK_CHECK_INTERVAL_MS = 5000
+WIFI_RECONNECT_INTERVAL_MS = 15000
+WIFI_CONNECT_TIMEOUT_MS = 10000
+OTA_STARTUP_DELAY_MS = 15000
 PARAMETER_KEYS = (
     "temp_c",
     "humidity",
@@ -288,10 +291,73 @@ class HumidityLight:
         self.led.write()
 
 
-def connect_wifi():
+def wifi_credentials():
+    try:
+        import secrets
+
+        return getattr(secrets, "WIFI_SSID", ""), getattr(secrets, "WIFI_PASSWORD", "")
+    except Exception:
+        return "", ""
+
+
+def connect_wifi(timeout_ms=WIFI_CONNECT_TIMEOUT_MS):
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
+    if wlan.isconnected():
+        return wlan
+
+    ssid, password = wifi_credentials()
+    if not ssid:
+        print("WiFi not configured in secrets.py")
+        return wlan
+
+    print("WiFi connecting from main...")
+    try:
+        wlan.connect(ssid, password)
+    except Exception as exc:
+        print("WiFi connect error:", repr(exc))
+        return wlan
+
+    deadline = time.ticks_add(time.ticks_ms(), timeout_ms)
+    while time.ticks_diff(deadline, time.ticks_ms()) > 0:
+        if wlan.isconnected():
+            print("WiFi connected from main IP:", wlan.ifconfig()[0])
+            return wlan
+        time.sleep_ms(250)
+
+    print("WiFi connect timeout, status:", wlan.status())
     return wlan
+
+
+def ensure_wifi_connected(wlan, timeout_ms=0):
+    wlan.active(True)
+    if wlan.isconnected():
+        return True
+
+    ssid, password = wifi_credentials()
+    if not ssid:
+        print("WiFi reconnect skipped: missing WIFI_SSID")
+        return False
+
+    try:
+        print("WiFi reconnecting...")
+        wlan.connect(ssid, password)
+    except Exception as exc:
+        print("WiFi reconnect error:", repr(exc))
+        return False
+
+    if timeout_ms <= 0:
+        return wlan.isconnected()
+
+    deadline = time.ticks_add(time.ticks_ms(), timeout_ms)
+    while time.ticks_diff(deadline, time.ticks_ms()) > 0:
+        if wlan.isconnected():
+            print("WiFi reconnected IP:", wlan.ifconfig()[0])
+            return True
+        time.sleep_ms(250)
+
+    print("WiFi reconnect timeout, status:", wlan.status())
+    return wlan.isconnected()
 
 
 def parse_request_path(request):
@@ -508,8 +574,15 @@ def ota_status(light, event, local_version, remote_version, path):
         pass
 
 
-def check_ota_periodic(light):
+def check_ota_periodic(light, wlan=None):
     try:
+        if wlan is not None and not ensure_wifi_connected(
+            wlan, timeout_ms=WIFI_CONNECT_TIMEOUT_MS
+        ):
+            print("OTA_ERROR WiFi is not connected")
+            light.show_color((160, 0, 0))
+            return
+
         import ota_updater
 
         ota_updater.check_for_updates(
@@ -532,6 +605,12 @@ def ota_check_interval_ms():
         seconds = OTA_CHECK_INTERVAL_SECONDS
 
     return int(seconds * 1000)
+
+
+def next_ota_check_ms(delay_ms=None):
+    if delay_ms is None:
+        delay_ms = ota_check_interval_ms()
+    return time.ticks_add(time.ticks_ms(), int(delay_ms))
 
 
 def show_activation(light):
@@ -597,7 +676,8 @@ def main():
         status_callback=lambda event: telegram_status(light, event),
     )
     server = make_server()
-    last_ota_check_ms = time.ticks_ms()
+    next_ota_ms = next_ota_check_ms(OTA_STARTUP_DELAY_MS)
+    last_wifi_reconnect_ms = time.ticks_ms()
     last_telegram_poll_ms = time.ticks_ms()
     last_sensor_link_check_ms = time.ticks_ms()
 
@@ -618,9 +698,17 @@ def main():
         light.animate()
         update_display(display, parameters, light)
         now_ms = time.ticks_ms()
-        if time.ticks_diff(now_ms, last_ota_check_ms) >= ota_check_interval_ms():
-            check_ota_periodic(light)
-            last_ota_check_ms = time.ticks_ms()
+        if (
+            not wlan.isconnected()
+            and time.ticks_diff(now_ms, last_wifi_reconnect_ms)
+            >= WIFI_RECONNECT_INTERVAL_MS
+        ):
+            ensure_wifi_connected(wlan, timeout_ms=0)
+            last_wifi_reconnect_ms = now_ms
+
+        if time.ticks_diff(now_ms, next_ota_ms) >= 0:
+            check_ota_periodic(light, wlan)
+            next_ota_ms = next_ota_check_ms()
 
         if (
             time.ticks_diff(now_ms, last_telegram_poll_ms)
@@ -636,6 +724,7 @@ def main():
             telegram.monitor_sensor_link(parameters, light)
             last_sensor_link_check_ms = time.ticks_ms()
 
+        force_ota = False
         try:
             client, address = server.accept()
         except OSError:
@@ -648,6 +737,9 @@ def main():
             if new_parameters is None:
                 if request.startswith("GET /status"):
                     send_response(client, "200 OK", status_body(parameters, light))
+                elif request.startswith("GET /ota"):
+                    send_response(client, "200 OK", "ota check requested")
+                    force_ota = True
                 else:
                     send_response(client, "404 Not Found", "not found")
             else:
@@ -686,6 +778,10 @@ def main():
                 pass
         finally:
             client.close()
+
+        if force_ota:
+            check_ota_periodic(light, wlan)
+            next_ota_ms = next_ota_check_ms()
 
 
 main()
