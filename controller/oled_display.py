@@ -171,13 +171,13 @@ class OledStatusDisplay:
         if label == good_label:
             return "OK"
         if label in alert_labels:
-            return "ALERT"
+            return "RED"
         if label in warning_labels:
-            return "WARN"
+            return "YEL"
         return "WAIT"
 
     def _metric_row(self, row, name, value, level="OK"):
-        issue = level in ("WARN", "ALERT")
+        issue = level in ("YEL", "RED")
         text = "%s %-6s %s" % (name, value, level)
         self._row(row, text, issue)
 
@@ -201,8 +201,8 @@ class OledStatusDisplay:
         return self._condition_level(
             light.soil_label,
             "soil_good",
-            ("soil_dry", "soil_wet"),
-            ("soil_critical_dry", "soil_too_wet"),
+            ("soil_wet",),
+            ("soil_critical_dry", "soil_dry", "soil_too_wet"),
         )
 
     def show_step(self, title, message=""):
@@ -260,7 +260,7 @@ class OledStatusDisplay:
             self._row(6, "P %smbar" % pressure)
             if link_issue:
                 self._metric_row(
-                    7, "LINK", self._short_label(light.sensor_link_label()), "ALERT"
+                    7, "LINK", self._short_label(light.sensor_link_label()), "RED"
                 )
             else:
                 self._row(7, "STATE %s" % self._short_label(light.effective_label()))

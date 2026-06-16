@@ -94,14 +94,14 @@ class HumidityLight:
         if value < 30:
             return "critical_dry", 1.0, (120, 0, 0)
         if value < 35:
-            return "dry", 0.75, (120, 25, 0)
+            return "dry", 0.65, (90, 74, 0)
         if value < 45:
-            return "low_humidity", 0.45, (110, 48, 0)
+            return "low_humidity", 0.45, (82, 70, 0)
         if value <= 70:
             return "humidity_good", 0, (0, 75, 20)
         if value <= 85:
-            return "humid", 0.45, (0, 35, 100)
-        return "too_humid", 1.0, (80, 0, 105)
+            return "humid", 0.45, (82, 70, 0)
+        return "too_humid", 1.0, (120, 0, 0)
 
     def _soil_condition(self, value):
         if value is None:
@@ -109,12 +109,12 @@ class HumidityLight:
         if value < 15:
             return "soil_critical_dry", 1.0, (120, 0, 0)
         if value < 35:
-            return "soil_dry", 0.7, (115, 42, 0)
+            return "soil_dry", 1.0, (120, 0, 0)
         if value <= 80:
             return "soil_good", 0, (0, 75, 20)
         if value <= 90:
-            return "soil_wet", 0.45, (0, 35, 100)
-        return "soil_too_wet", 0.8, (80, 0, 105)
+            return "soil_wet", 0.45, (82, 70, 0)
+        return "soil_too_wet", 1.0, (120, 0, 0)
 
     def _mix_conditions(self, temp_color, temp_severity, humidity_color, humidity_severity):
         if self.temp_c is None and self.humidity is None:

@@ -1,16 +1,16 @@
 {
-    "version":  16,
+    "version":  17,
     "device":  "controller",
     "files":  [
                   {
                       "path":  "version.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/version.py",
-                      "sha256":  "260ebbfef0f4825b4ca46fa1aa3ded3e4c4a723828d115a73668fe87bd2120e4"
+                      "sha256":  "f0a29184287b239bea179ccc12b129ceddb7463f26787aef83f3819682a4dd20"
                   },
                   {
                       "path":  "main.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/main.py",
-                      "sha256":  "62ef1aaea804241647be24bf7fb3fa306299d7dbf9d22143f6b8bdad9624cdf6"
+                      "sha256":  "434a58369ab9a796ff770b583016ed1d99228b63f0ebbcb9778556de8cd004d5"
                   },
                   {
                       "path":  "ota_updater.py",
@@ -30,8 +30,8 @@
                   {
                       "path":  "oled_display.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/oled_display.py",
-                      "sha256":  "f8080f0666f7d04ac0ca4cc48f83381b305eb0a895c289283ea7cd76ada58e19"
+                      "sha256":  "dcd3d7599ef8f2987887453c4a0677d5429da6d2f0e00ef353ed4649612acf55"
                   }
               ],
-    "signature":  "644e59cfb343b8482d710d3e0d1bfa0931ef65770a9643ac97abef24739dc036"
+    "signature":  "ffed82f0480ef137c516c1d2ffc32f5ec3e51c1511611493732cc06e55fea025"
 }
