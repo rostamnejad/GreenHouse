@@ -53,6 +53,9 @@ class OledStatusDisplay:
         self.available = False
         self.refresh_ms = int(config_value("OLED_REFRESH_MS", DEFAULT_REFRESH_MS))
         self.last_update_ms = 0
+        self.clock_source = None
+        self.clock_anchor_ms = 0
+        self.clock_anchor_seconds = 0
 
         if not config_value("OLED_ENABLED", True):
             print("OLED disabled")
@@ -97,29 +100,60 @@ class OledStatusDisplay:
     def _clip(self, text):
         return str(text)[: self.display.width // 8]
 
-    def _line(self, row, text):
-        self.display.text(self._clip(text), 0, row * 8, 1)
+    def _line(self, row, text, color=1):
+        self.display.text(self._clip(text), 0, row * 8, color)
+
+    def _row(self, row, text, invert=False):
+        y = row * 8
+        if invert:
+            self.display.fill_rect(0, y, self.display.width, 8, 1)
+            self.display.text(self._clip(text), 0, y, 0)
+        else:
+            self.display.text(self._clip(text), 0, y, 1)
 
     def _float_value(self, value, digits=1):
         if value is None:
             return "--"
         return ("%0.*f" % (digits, value)).strip()
 
-    def _time_line(self, parameters):
+    def _sync_clock(self, parameters, now_ms):
         if parameters.get("hour") is None or parameters.get("minute") is None:
-            time_value = "--:--"
-        else:
-            time_value = "%02d:%02d" % (parameters["hour"], parameters["minute"])
+            return
 
+        second = parameters.get("second")
+        if second is None:
+            second = 0
+
+        source = (parameters["hour"], parameters["minute"], second)
+        if source == self.clock_source:
+            return
+
+        self.clock_source = source
+        self.clock_anchor_ms = now_ms
+        self.clock_anchor_seconds = (
+            parameters["hour"] * 3600 + parameters["minute"] * 60 + second
+        )
+
+    def _time_text(self, now_ms):
+        if self.clock_source is None:
+            return "--:--:--"
+
+        elapsed = int(time.ticks_diff(now_ms, self.clock_anchor_ms) / 1000)
+        total = (self.clock_anchor_seconds + elapsed) % 86400
+        hour = total // 3600
+        minute = (total % 3600) // 60
+        second = total % 60
+        return "%02d:%02d:%02d" % (hour, minute, second)
+
+    def _date_text(self, parameters):
         if (
             parameters.get("jy") is None
             or parameters.get("jm") is None
             or parameters.get("jd") is None
         ):
-            return time_value
+            return "----/--/--"
 
-        return "%s %04d/%02d/%02d" % (
-            time_value,
+        return "%04d/%02d/%02d" % (
             parameters["jy"],
             parameters["jm"],
             parameters["jd"],
@@ -127,6 +161,20 @@ class OledStatusDisplay:
 
     def _short_label(self, label):
         return SHORT_LABELS.get(label, str(label).upper()[:6])
+
+    def _metric_row(self, row, name, value, state="", issue=False):
+        marker = "!" if issue else " "
+        if state:
+            text = "%s%s %-6s %s" % (marker, name, value, state)
+        else:
+            text = "%s%s %s" % (marker, name, value)
+        self._row(row, text, issue)
+
+    def _is_temp_issue(self, light):
+        return light.temp_c is not None and light.temperature_label != "temp_good"
+
+    def _is_humidity_issue(self, light):
+        return light.humidity is not None and light.humidity_label != "humidity_good"
 
     def show_message(self, title, message=""):
         if not self.available:
@@ -152,12 +200,42 @@ class OledStatusDisplay:
             return
 
         try:
+            self._sync_clock(parameters, now)
             temp = self._float_value(parameters.get("temp_c"), 1)
             humidity = self._float_value(light.humidity, 1)
+            pressure = self._float_value(parameters.get("pressure_mbar"), 0)
+            temp_issue = self._is_temp_issue(light)
+            humidity_issue = self._is_humidity_issue(light)
+            pressure_issue = parameters.get("pressure_mbar") is None
+            link_issue = light.sensor_link_label() != "sensor_ok"
+            state_issue = light.effective_label() not in ("good", "sensor_ok")
 
             self.display.fill(0)
-            self._line(1, "TEMP: %s C" % temp)
-            self._line(3, "HUM : %s %%" % humidity)
+            self.display.fill_rect(0, 0, self.display.width, 8, 1)
+            self._line(0, "%s  v%d" % (self._time_text(now), self.app_version), 0)
+            self._row(1, "DATE %s" % self._date_text(parameters))
+            self.display.hline(0, 17, self.display.width, 1)
+            self._metric_row(
+                3,
+                "T",
+                "%sC" % temp,
+                self._short_label(light.temperature_label),
+                temp_issue,
+            )
+            self._metric_row(
+                4,
+                "H",
+                "%s%%" % humidity,
+                self._short_label(light.humidity_label),
+                humidity_issue,
+            )
+            self._metric_row(5, "P", "%smbar" % pressure, "", pressure_issue)
+            self._metric_row(
+                6, "LINK", self._short_label(light.sensor_link_label()), "", link_issue
+            )
+            self._metric_row(
+                7, "STATE", self._short_label(light.effective_label()), "", state_issue
+            )
             self.display.show()
             self.last_update_ms = now
         except Exception as exc:

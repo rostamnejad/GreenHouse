@@ -357,7 +357,7 @@ def send_parameters_to_controller(
 
         request = (
             "GET /parameters?temp_c=%.2f&humidity=%.2f&pressure_mbar=%.2f&altitude_m=%.1f"
-            "&sensor_version=%d&hour=%d&minute=%d&jy=%d&jm=%d&jd=%d HTTP/1.0\r\n"
+            "&sensor_version=%d&hour=%d&minute=%d&second=%d&jy=%d&jm=%d&jd=%d HTTP/1.0\r\n"
             "Host: %s\r\n"
             "Connection: close\r\n"
             "\r\n"
@@ -369,6 +369,7 @@ def send_parameters_to_controller(
             APP_VERSION,
             now[3],
             now[4],
+            now[5],
             jy,
             jm,
             jd,
@@ -523,8 +524,19 @@ def main():
                 temp_c, humidity, pressure_mbar, altitude_m, now, jy, jm, jd
             )
             print(
-                "TIME=%02d:%02d JDATE=%04d/%02d/%02d TEMP_C=%.2f HUMIDITY=%.2f PRESSURE_MBAR=%.2f ALTITUDE_M=%.1f"
-                % (now[3], now[4], jy, jm, jd, temp_c, humidity, pressure_mbar, altitude_m)
+                "TIME=%02d:%02d:%02d JDATE=%04d/%02d/%02d TEMP_C=%.2f HUMIDITY=%.2f PRESSURE_MBAR=%.2f ALTITUDE_M=%.1f"
+                % (
+                    now[3],
+                    now[4],
+                    now[5],
+                    jy,
+                    jm,
+                    jd,
+                    temp_c,
+                    humidity,
+                    pressure_mbar,
+                    altitude_m,
+                )
             )
 
             display.show_time(now[3], now[4])

@@ -31,6 +31,7 @@ PARAMETER_KEYS = (
     "sensor_version",
     "hour",
     "minute",
+    "second",
     "jy",
     "jm",
     "jd",
@@ -47,6 +48,10 @@ class HumidityLight:
         self.label = "waiting"
         self.severity = 0
         self.base_color = (40, 40, 40)
+        self.temp_color = (40, 40, 40)
+        self.temp_severity = 0
+        self.humidity_color = (40, 40, 40)
+        self.humidity_severity = 0
         self.updated_ms = time.ticks_ms()
         self.has_reading = False
         self.transient_event = ""
@@ -136,10 +141,17 @@ class HumidityLight:
 
         self.temperature_label = temp_label
         self.humidity_label = humidity_label
+        self.temp_color = temp_color
+        self.temp_severity = temp_severity
+        self.humidity_color = humidity_color
+        self.humidity_severity = humidity_severity
         self.severity = max(temp_severity, humidity_severity)
-        self.base_color = self._mix_conditions(
-            temp_color, temp_severity, humidity_color, humidity_severity
-        )
+        if self.severity == 0:
+            self.base_color = (0, 200, 0)
+        elif temp_severity >= humidity_severity:
+            self.base_color = temp_color
+        else:
+            self.base_color = humidity_color
 
         if self.temp_c is None and self.humidity is None:
             self.label = "waiting"
@@ -209,6 +221,14 @@ class HumidityLight:
         else:
             self.led[0] = (18, 0, 0)
 
+    def _active_condition_colors(self):
+        colors = []
+        if self.temp_c is not None and self.temp_severity > 0:
+            colors.append((self.temp_color, self.temp_severity))
+        if self.humidity is not None and self.humidity_severity > 0:
+            colors.append((self.humidity_color, self.humidity_severity))
+        return colors
+
     def animate(self):
         now = time.ticks_ms()
 
@@ -216,13 +236,22 @@ class HumidityLight:
             self._animate_transient(now)
         elif self.sensor_link_label() != "sensor_ok":
             self._animate_sensor_missing(now)
-        elif self.label == "alert":
-            self.led[0] = self.base_color if (now // 300) % 2 == 0 else (0, 0, 0)
         else:
-            pulse = 0.12 + (0.42 + 0.18 * self.severity) * (
-                1 + math.sin(now / 850)
-            ) / 2
-            self.led[0] = self._scale(self.base_color, pulse)
+            condition_colors = self._active_condition_colors()
+            if condition_colors:
+                if len(condition_colors) == 1:
+                    color, severity = condition_colors[0]
+                else:
+                    color, severity = condition_colors[(now // 900) % len(condition_colors)]
+
+                if severity >= 0.9 and (now // 280) % 2 == 1:
+                    self.led[0] = (0, 0, 0)
+                else:
+                    pulse = 0.18 + 0.72 * (1 + math.sin(now / 650)) / 2
+                    self.led[0] = self._scale(color, pulse)
+            else:
+                pulse = 0.12 + 0.42 * (1 + math.sin(now / 850)) / 2
+                self.led[0] = self._scale((0, 200, 0), pulse)
 
         self.led.write()
 
@@ -271,7 +300,7 @@ def parse_parameters(path):
             if key in query:
                 parameters[key] = float(query[key])
 
-        for key in ("sensor_version", "hour", "minute", "jy", "jm", "jd"):
+        for key in ("sensor_version", "hour", "minute", "second", "jy", "jm", "jd"):
             if key in query:
                 parameters[key] = int(query[key])
 
@@ -293,7 +322,12 @@ def pressure_to_altitude_m(pressure_mbar):
 def status_body(parameters, light):
     time_value = "--:--"
     if parameters["hour"] is not None and parameters["minute"] is not None:
-        time_value = "%02d:%02d" % (parameters["hour"], parameters["minute"])
+        second = parameters["second"] if parameters["second"] is not None else 0
+        time_value = "%02d:%02d:%02d" % (
+            parameters["hour"],
+            parameters["minute"],
+            second,
+        )
 
     date_value = "----/--/--"
     if (
@@ -353,7 +387,11 @@ def print_serial_parameters(parameters, light):
     parts = []
 
     if parameters["hour"] is not None and parameters["minute"] is not None:
-        parts.append("TIME=%02d:%02d" % (parameters["hour"], parameters["minute"]))
+        second = parameters["second"] if parameters["second"] is not None else 0
+        parts.append(
+            "TIME=%02d:%02d:%02d"
+            % (parameters["hour"], parameters["minute"], second)
+        )
 
     if (
         parameters["jy"] is not None
