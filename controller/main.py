@@ -77,44 +77,44 @@ class HumidityLight:
 
     def _temperature_condition(self, value):
         if value is None:
-            return "waiting", 0, (40, 40, 40)
+            return "waiting", 0, (8, 8, 8)
         if value < 12:
-            return "too_cold", 1.0, (0, 20, 255)
+            return "too_cold", 1.0, (0, 15, 110)
         if value < 18:
-            return "cold", 0.6, (0, 150, 255)
+            return "cold", 0.6, (0, 65, 100)
         if value <= 28:
-            return "temp_good", 0, (0, 200, 0)
+            return "temp_good", 0, (0, 75, 20)
         if value <= 32:
-            return "warm", 0.45, (255, 170, 0)
-        return "hot", 1.0, (255, 0, 0)
+            return "warm", 0.45, (110, 55, 0)
+        return "hot", 1.0, (120, 0, 0)
 
     def _humidity_condition(self, value):
         if value is None:
-            return "waiting", 0, (40, 40, 40)
+            return "waiting", 0, (8, 8, 8)
         if value < 30:
-            return "critical_dry", 1.0, (255, 0, 0)
+            return "critical_dry", 1.0, (120, 0, 0)
         if value < 35:
-            return "dry", 0.75, (255, 35, 0)
+            return "dry", 0.75, (120, 25, 0)
         if value < 45:
-            return "low_humidity", 0.45, (255, 115, 0)
+            return "low_humidity", 0.45, (110, 48, 0)
         if value <= 70:
-            return "humidity_good", 0, (0, 200, 0)
+            return "humidity_good", 0, (0, 75, 20)
         if value <= 85:
-            return "humid", 0.45, (0, 80, 255)
-        return "too_humid", 1.0, (190, 0, 255)
+            return "humid", 0.45, (0, 35, 100)
+        return "too_humid", 1.0, (80, 0, 105)
 
     def _soil_condition(self, value):
         if value is None:
-            return "waiting", 0, (40, 40, 40)
+            return "waiting", 0, (8, 8, 8)
         if value < 15:
-            return "soil_critical_dry", 1.0, (255, 0, 0)
+            return "soil_critical_dry", 1.0, (120, 0, 0)
         if value < 35:
-            return "soil_dry", 0.7, (255, 90, 0)
+            return "soil_dry", 0.7, (115, 42, 0)
         if value <= 80:
-            return "soil_good", 0, (0, 200, 0)
+            return "soil_good", 0, (0, 75, 20)
         if value <= 90:
-            return "soil_wet", 0.45, (0, 80, 255)
-        return "soil_too_wet", 0.8, (160, 0, 255)
+            return "soil_wet", 0.45, (0, 35, 100)
+        return "soil_too_wet", 0.8, (80, 0, 105)
 
     def _mix_conditions(self, temp_color, temp_severity, humidity_color, humidity_severity):
         if self.temp_c is None and self.humidity is None:
@@ -176,7 +176,7 @@ class HumidityLight:
         self.soil_severity = soil_severity
         self.severity = max(temp_severity, humidity_severity, soil_severity)
         if self.severity == 0:
-            self.base_color = (0, 200, 0)
+            self.base_color = (0, 75, 20)
         elif temp_severity >= humidity_severity and temp_severity >= soil_severity:
             self.base_color = temp_color
         elif humidity_severity >= soil_severity:
@@ -220,10 +220,10 @@ class HumidityLight:
     def _animate_transient(self, now):
         if self.transient_event == "telegram_sent":
             phase = (now // 130) % 8
-            self.led[0] = (0, 230, 0) if phase in (0, 2, 4, 6) else (0, 0, 0)
+            self.led[0] = (0, 95, 22) if phase in (0, 2, 4, 6) else (0, 0, 0)
         elif self.transient_event == "telegram_failed":
             phase = (now // 160) % 6
-            self.led[0] = (220, 0, 0) if phase in (0, 2) else (0, 0, 0)
+            self.led[0] = (120, 0, 0) if phase in (0, 2) else (0, 0, 0)
         else:
             self.led[0] = (0, 0, 0)
 
@@ -248,11 +248,11 @@ class HumidityLight:
     def _animate_sensor_missing(self, now):
         phase = (now // 180) % 12
         if phase in (0, 2):
-            self.led[0] = (220, 0, 0)
+            self.led[0] = (120, 0, 0)
         elif phase in (1, 3):
             self.led[0] = (0, 0, 0)
         else:
-            self.led[0] = (18, 0, 0)
+            self.led[0] = (12, 0, 0)
 
     def _active_condition_colors(self):
         colors = []
@@ -285,8 +285,8 @@ class HumidityLight:
                     pulse = 0.18 + 0.72 * (1 + math.sin(now / 650)) / 2
                     self.led[0] = self._scale(color, pulse)
             else:
-                pulse = 0.12 + 0.42 * (1 + math.sin(now / 850)) / 2
-                self.led[0] = self._scale((0, 200, 0), pulse)
+                pulse = 0.12 + 0.38 * (1 + math.sin(now / 850)) / 2
+                self.led[0] = self._scale((0, 75, 20), pulse)
 
         self.led.write()
 
@@ -300,36 +300,47 @@ def wifi_credentials():
         return "", ""
 
 
-def connect_wifi(timeout_ms=WIFI_CONNECT_TIMEOUT_MS):
+def display_step(display, title, message=""):
+    if display is not None:
+        display.show_step(title, message)
+
+
+def connect_wifi(display=None, timeout_ms=WIFI_CONNECT_TIMEOUT_MS):
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     if wlan.isconnected():
+        display_step(display, "WiFi OK", wlan.ifconfig()[0])
         return wlan
 
     ssid, password = wifi_credentials()
     if not ssid:
         print("WiFi not configured in secrets.py")
+        display_step(display, "WiFi config", "missing SSID")
         return wlan
 
     print("WiFi connecting from main...")
+    display_step(display, "WiFi", "connecting...")
     try:
         wlan.connect(ssid, password)
     except Exception as exc:
         print("WiFi connect error:", repr(exc))
+        display_step(display, "WiFi error", "connect failed")
         return wlan
 
     deadline = time.ticks_add(time.ticks_ms(), timeout_ms)
     while time.ticks_diff(deadline, time.ticks_ms()) > 0:
         if wlan.isconnected():
             print("WiFi connected from main IP:", wlan.ifconfig()[0])
+            display_step(display, "WiFi OK", wlan.ifconfig()[0])
             return wlan
         time.sleep_ms(250)
 
     print("WiFi connect timeout, status:", wlan.status())
+    display_step(display, "WiFi timeout", "status %s" % wlan.status())
     return wlan
 
 
-def ensure_wifi_connected(wlan, timeout_ms=0):
+def ensure_wifi_connected(wlan, timeout_ms=0, display=None):
     wlan.active(True)
     if wlan.isconnected():
         return True
@@ -337,13 +348,16 @@ def ensure_wifi_connected(wlan, timeout_ms=0):
     ssid, password = wifi_credentials()
     if not ssid:
         print("WiFi reconnect skipped: missing WIFI_SSID")
+        display_step(display, "WiFi config", "missing SSID")
         return False
 
     try:
         print("WiFi reconnecting...")
+        display_step(display, "WiFi", "reconnecting...")
         wlan.connect(ssid, password)
     except Exception as exc:
         print("WiFi reconnect error:", repr(exc))
+        display_step(display, "WiFi error", "reconnect failed")
         return False
 
     if timeout_ms <= 0:
@@ -353,10 +367,12 @@ def ensure_wifi_connected(wlan, timeout_ms=0):
     while time.ticks_diff(deadline, time.ticks_ms()) > 0:
         if wlan.isconnected():
             print("WiFi reconnected IP:", wlan.ifconfig()[0])
+            display_step(display, "WiFi OK", wlan.ifconfig()[0])
             return True
         time.sleep_ms(250)
 
     print("WiFi reconnect timeout, status:", wlan.status())
+    display_step(display, "WiFi timeout", "status %s" % wlan.status())
     return wlan.isconnected()
 
 
@@ -560,27 +576,33 @@ def print_serial_parameters(parameters, light):
     print("PARAMETERS " + " ".join(parts))
 
 
-def ota_status(light, event, local_version, remote_version, path):
+def ota_status(light, display, event, local_version, remote_version, path):
     print("OTA_STATUS", event, local_version, remote_version, path)
     if event == "checking":
-        light.show_color((0, 30, 80))
+        display_step(display, "OTA", "checking...")
+        light.show_color((0, 12, 42))
     elif event == "up_to_date":
-        light.show_color((0, 90, 0))
+        display_step(display, "OTA OK", "v%d" % local_version)
+        light.show_color((0, 55, 12))
     elif event in ("update_available", "downloading", "installing"):
-        light.show_color((90, 0, 160))
+        display_step(display, "OTA %s" % event[:6], path or "v%d" % remote_version)
+        light.show_color((42, 0, 70))
     elif event == "installed":
-        light.show_color((0, 180, 0))
+        display_step(display, "OTA done", "resetting...")
+        light.show_color((0, 75, 20))
     elif event == "disabled":
+        display_step(display, "OTA disabled", "")
         pass
 
 
-def check_ota_periodic(light, wlan=None):
+def check_ota_periodic(light, wlan=None, display=None):
     try:
         if wlan is not None and not ensure_wifi_connected(
-            wlan, timeout_ms=WIFI_CONNECT_TIMEOUT_MS
+            wlan, timeout_ms=WIFI_CONNECT_TIMEOUT_MS, display=display
         ):
             print("OTA_ERROR WiFi is not connected")
-            light.show_color((160, 0, 0))
+            display_step(display, "OTA error", "no WiFi")
+            light.show_color((100, 0, 0))
             return
 
         import ota_updater
@@ -588,12 +610,13 @@ def check_ota_periodic(light, wlan=None):
         ota_updater.check_for_updates(
             current_version=APP_VERSION,
             status_callback=lambda event, local, remote, path: ota_status(
-                light, event, local, remote, path
+                light, display, event, local, remote, path
             ),
         )
     except Exception as exc:
         print("OTA_ERROR", repr(exc))
-        light.show_color((160, 0, 0))
+        display_step(display, "OTA error", "check serial")
+        light.show_color((100, 0, 0))
 
 
 def ota_check_interval_ms():
@@ -616,7 +639,7 @@ def next_ota_check_ms(delay_ms=None):
 def show_activation(light):
     print("RGB activation ready")
     for _ in range(8):
-        light.show_color((0, 220, 0))
+        light.show_color((0, 80, 20))
         time.sleep_ms(120)
         light.off()
         time.sleep_ms(120)
@@ -664,18 +687,21 @@ def send_response(client, status, body):
 
 
 def main():
-    wlan = connect_wifi()
     light = HumidityLight()
     parameters = {}
     for key in PARAMETER_KEYS:
         parameters[key] = None
     display = make_display(APP_VERSION)
+    display_step(display, "Boot", "starting...")
+    wlan = connect_wifi(display=display)
 
     telegram = TelegramNotifier(
         APP_VERSION,
         status_callback=lambda event: telegram_status(light, event),
     )
+    display_step(display, "Server", "starting...")
     server = make_server()
+    display_step(display, "Server OK", "port %d" % HTTP_PORT)
     next_ota_ms = next_ota_check_ms(OTA_STARTUP_DELAY_MS)
     last_wifi_reconnect_ms = time.ticks_ms()
     last_telegram_poll_ms = time.ticks_ms()
@@ -692,6 +718,7 @@ def main():
             display.show_message("WiFi error", "status %s" % wlan.status())
 
     show_activation(light)
+    display_step(display, "Sensor", "waiting...")
     update_display(display, parameters, light, force=True)
 
     while True:
@@ -703,11 +730,11 @@ def main():
             and time.ticks_diff(now_ms, last_wifi_reconnect_ms)
             >= WIFI_RECONNECT_INTERVAL_MS
         ):
-            ensure_wifi_connected(wlan, timeout_ms=0)
+            ensure_wifi_connected(wlan, timeout_ms=0, display=display)
             last_wifi_reconnect_ms = now_ms
 
         if time.ticks_diff(now_ms, next_ota_ms) >= 0:
-            check_ota_periodic(light, wlan)
+            check_ota_periodic(light, wlan, display)
             next_ota_ms = next_ota_check_ms()
 
         if (
@@ -780,7 +807,7 @@ def main():
             client.close()
 
         if force_ota:
-            check_ota_periodic(light, wlan)
+            check_ota_periodic(light, wlan, display)
             next_ota_ms = next_ota_check_ms()
 
 

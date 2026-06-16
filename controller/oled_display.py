@@ -167,22 +167,46 @@ class OledStatusDisplay:
     def _short_label(self, label):
         return SHORT_LABELS.get(label, str(label).upper()[:6])
 
-    def _metric_row(self, row, name, value, state="", issue=False):
-        marker = "!" if issue else " "
-        if state:
-            text = "%s%s %-6s %s" % (marker, name, value, state)
-        else:
-            text = "%s%s %s" % (marker, name, value)
+    def _condition_level(self, label, good_label, warning_labels, alert_labels):
+        if label == good_label:
+            return "OK"
+        if label in alert_labels:
+            return "ALERT"
+        if label in warning_labels:
+            return "WARN"
+        return "WAIT"
+
+    def _metric_row(self, row, name, value, level="OK"):
+        issue = level in ("WARN", "ALERT")
+        text = "%s %-6s %s" % (name, value, level)
         self._row(row, text, issue)
 
-    def _is_temp_issue(self, light):
-        return light.temp_c is not None and light.temperature_label != "temp_good"
+    def _temp_level(self, light):
+        return self._condition_level(
+            light.temperature_label,
+            "temp_good",
+            ("cold", "warm"),
+            ("too_cold", "hot"),
+        )
 
-    def _is_humidity_issue(self, light):
-        return light.humidity is not None and light.humidity_label != "humidity_good"
+    def _humidity_level(self, light):
+        return self._condition_level(
+            light.humidity_label,
+            "humidity_good",
+            ("dry", "low_humidity", "humid"),
+            ("critical_dry", "too_humid"),
+        )
 
-    def _is_soil_issue(self, light):
-        return light.soil_moisture is not None and light.soil_label != "soil_good"
+    def _soil_level(self, light):
+        return self._condition_level(
+            light.soil_label,
+            "soil_good",
+            ("soil_dry", "soil_wet"),
+            ("soil_critical_dry", "soil_too_wet"),
+        )
+
+    def show_step(self, title, message=""):
+        self.show_message(title, message)
 
     def show_message(self, title, message=""):
         if not self.available:
@@ -209,52 +233,37 @@ class OledStatusDisplay:
 
         try:
             self._sync_clock(parameters, now)
+            if light.sensor_link_label() == "sensor_waiting":
+                self.display.fill(0)
+                self._line(0, "GreenHouse v%d" % self.app_version)
+                self.display.hline(0, 10, self.display.width, 1)
+                self._line(2, "Sensor")
+                self._line(3, "waiting...")
+                self.display.show()
+                self.last_update_ms = now
+                return
+
             temp = self._float_value(parameters.get("temp_c"), 1)
             humidity = self._float_value(light.humidity, 1)
             pressure = self._float_value(parameters.get("pressure_mbar"), 0)
             soil = self._float_value(light.soil_moisture, 1)
-            temp_issue = self._is_temp_issue(light)
-            humidity_issue = self._is_humidity_issue(light)
-            soil_issue = self._is_soil_issue(light)
-            pressure_issue = parameters.get("pressure_mbar") is None
             link_issue = light.sensor_link_label() != "sensor_ok"
-            state_issue = light.effective_label() not in ("good", "sensor_ok")
 
             self.display.fill(0)
             self.display.fill_rect(0, 0, self.display.width, 8, 1)
-            self._line(0, "%s  v%d" % (self._time_text(now), self.app_version), 0)
-            self._row(1, "DATE %s" % self._date_text(parameters))
+            self._line(0, "%s v%d" % (self._time_text(now), self.app_version), 0)
+            self._row(1, self._date_text(parameters))
             self.display.hline(0, 17, self.display.width, 1)
-            self._metric_row(
-                3,
-                "T",
-                "%sC" % temp,
-                self._short_label(light.temperature_label),
-                temp_issue,
-            )
-            self._metric_row(
-                4,
-                "H",
-                "%s%%" % humidity,
-                self._short_label(light.humidity_label),
-                humidity_issue,
-            )
-            self._metric_row(5, "P", "%smbar" % pressure, "", pressure_issue)
-            self._metric_row(
-                6,
-                "S",
-                "%s%%" % soil,
-                self._short_label(light.soil_label),
-                soil_issue,
-            )
+            self._metric_row(3, "TEMP", "%sC" % temp, self._temp_level(light))
+            self._metric_row(4, "AIR", "%s%%" % humidity, self._humidity_level(light))
+            self._metric_row(5, "SOIL", "%s%%" % soil, self._soil_level(light))
+            self._row(6, "P %smbar" % pressure)
             if link_issue:
                 self._metric_row(
-                    7, "LINK", self._short_label(light.sensor_link_label()), "", True
+                    7, "LINK", self._short_label(light.sensor_link_label()), "ALERT"
                 )
             else:
-                self._metric_row(
-                    7, "STATE", self._short_label(light.effective_label()), "", state_issue
-                )
+                self._row(7, "STATE %s" % self._short_label(light.effective_label()))
             self.display.show()
             self.last_update_ms = now
         except Exception as exc:

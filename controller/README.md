@@ -38,8 +38,8 @@ RGB climate state:
 
 OLED status display:
 - The controller supports a 0.96 inch SSD1306 SPI OLED with pins labeled `GND VCC D0 D1 RES DC CS`.
-- The OLED shows live time with seconds, Jalali date with year, temperature, air humidity, barometric pressure, soil moisture, and overall state.
-- The OLED is monochrome, so error rows are highlighted with an inverted row and `!` marker instead of red text.
+- The OLED shows startup/connectivity steps, then a compact live status page for temperature, air humidity, soil moisture, pressure, and state.
+- The OLED is monochrome, so warning/error rows are highlighted and labeled `WARN` or `ALERT` instead of using real yellow/red pixels.
 - Recommended wiring:
   `GND -> GND`, `VCC -> 3V3`, `D0 -> GPIO12`, `D1 -> GPIO11`, `RES -> GPIO9`, `DC -> GPIO10`, `CS -> GPIO8`.
 - Upload `ssd1306.py` and `oled_display.py` to the controller board along with `main.py`.
