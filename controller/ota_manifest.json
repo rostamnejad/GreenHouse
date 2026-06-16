@@ -1,16 +1,16 @@
 {
-    "version":  13,
+    "version":  14,
     "device":  "controller",
     "files":  [
                   {
                       "path":  "version.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/version.py",
-                      "sha256":  "52c9c1c241ad7c168654b471b77b049738b63b44778a2be03a012296eacb425d"
+                      "sha256":  "bf352358a3e2ab7ef62bb29af80ba33e7261950a040b3c8bd7c2127beee11400"
                   },
                   {
                       "path":  "main.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/main.py",
-                      "sha256":  "a981bb560b8d3f078ad27c51cb091f47a413112137c4fd973d9057704cb405ff"
+                      "sha256":  "5b0883675c54e392c88deeb3a3d1fa25e18a38e34bb6e24b1eb5f88c7e52584f"
                   },
                   {
                       "path":  "ota_updater.py",
@@ -20,7 +20,7 @@
                   {
                       "path":  "telegram_notifier.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/telegram_notifier.py",
-                      "sha256":  "7a1ada5ab3980d491748a7155fcc9a95ffce7346833d139859f5b8898dc280e8"
+                      "sha256":  "087fe75e082ed46e258d82a77032326359fc312dfc0c316ca5be5c9c1cd39689"
                   },
                   {
                       "path":  "ssd1306.py",
@@ -30,8 +30,8 @@
                   {
                       "path":  "oled_display.py",
                       "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/oled_display.py",
-                      "sha256":  "ce55ed06b7e8c637ee1b97208959e0af8431f5e07b3fbf41483e4fe3b7b8e9e5"
+                      "sha256":  "c2bbb680eac329b485d77faa92726584a7d91e876c48022fadb04a83ec736371"
                   }
               ],
-    "signature":  "483ff519254d5af4a426b26436cfa2f4d56a2fc252ef218eb9e7498a09c535c1"
+    "signature":  "c343a94341725a804fb48e7e72328f09f29993670e1fb38ffa27bbaa7596dd80"
 }

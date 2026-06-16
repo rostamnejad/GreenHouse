@@ -10,6 +10,8 @@ TEMP_MIN_C = 18.0
 TEMP_MAX_C = 28.0
 HUMIDITY_MIN_PERCENT = 45.0
 HUMIDITY_MAX_PERCENT = 70.0
+SOIL_MIN_PERCENT = 35.0
+SOIL_MAX_PERCENT = 80.0
 LABEL_TEXT = {
     "waiting": "در انتظار",
     "too_cold": "خیلی سرد",
@@ -23,6 +25,11 @@ LABEL_TEXT = {
     "humidity_good": "مناسب",
     "humid": "مرطوب",
     "too_humid": "رطوبت خیلی بالا",
+    "soil_critical_dry": "خشکی بحرانی خاک",
+    "soil_dry": "خاک خشک",
+    "soil_good": "مناسب",
+    "soil_wet": "خاک مرطوب",
+    "soil_too_wet": "خاک خیلی خیس",
 }
 STATE_TEXT = {
     "good": "سالم",
@@ -68,6 +75,11 @@ LABEL_ICON = {
     "humidity_good": "🟢",
     "humid": "🟠",
     "too_humid": "🔴",
+    "soil_critical_dry": "🔴",
+    "soil_dry": "🟠",
+    "soil_good": "🟢",
+    "soil_wet": "🟠",
+    "soil_too_wet": "🔴",
 }
 
 
@@ -163,12 +175,27 @@ def _humidity_action(value):
     return ""
 
 
+def _soil_action(value):
+    if value is None:
+        return ""
+    if value < SOIL_MIN_PERCENT:
+        return "رطوبت خاک را حدود %.1f درصد بالا ببر." % (
+            SOIL_MIN_PERCENT - value
+        )
+    if value > SOIL_MAX_PERCENT:
+        return "آبیاری را کمتر کن؛ رطوبت خاک حدود %.1f درصد بالاتر از محدوده است." % (
+            value - SOIL_MAX_PERCENT
+        )
+    return ""
+
+
 def _required_actions(parameters):
     actions = []
     temp_action = _temperature_action(parameters.get("temp_c"))
     humidity_action = _humidity_action(parameters.get("humidity"))
+    soil_action = _soil_action(parameters.get("soil_moisture"))
 
-    for action in (temp_action, humidity_action):
+    for action in (temp_action, humidity_action, soil_action):
         if action:
             actions.append(action)
 
@@ -409,13 +436,16 @@ class TelegramNotifier:
         sensor_version = _value(parameters, "sensor_version")
         temp_value = parameters.get("temp_c")
         humidity_value = parameters.get("humidity")
+        soil_value = parameters.get("soil_moisture")
         temp_icon = _label_icon(light.temperature_label)
         humidity_icon = _label_icon(light.humidity_label)
+        soil_icon = _label_icon(light.soil_label)
         temp_check = "مناسب" if light.temperature_label == "temp_good" else "بررسی"
         humidity_check = (
             "مناسب" if light.humidity_label == "humidity_good" else "بررسی"
         )
         pressure_icon = "🔵"
+        soil_check = "مناسب" if light.soil_label == "soil_good" else "بررسی"
         action_lines = _action_lines(parameters)
 
         return (
@@ -432,6 +462,12 @@ class TelegramNotifier:
             "جایگاه     : %s %s\n"
             "\n"
             "%s رطوبت - %s\n"
+            "مقدار      : %s %%\n"
+            "محدوده سالم: %.0f-%.0f %%\n"
+            "وضعیت      : %s %s\n"
+            "جایگاه     : %s %s\n"
+            "\n"
+            "%s رطوبت خاک - %s\n"
             "مقدار      : %s %%\n"
             "محدوده سالم: %.0f-%.0f %%\n"
             "وضعیت      : %s %s\n"
@@ -474,6 +510,15 @@ class TelegramNotifier:
                     HUMIDITY_MAX_PERCENT,
                     "%",
                 ),
+                soil_icon,
+                soil_check,
+                _fmt(soil_value, 1),
+                SOIL_MIN_PERCENT,
+                SOIL_MAX_PERCENT,
+                soil_icon,
+                _label(light.soil_label),
+                soil_icon,
+                _range_position(soil_value, SOIL_MIN_PERCENT, SOIL_MAX_PERCENT, "%"),
                 pressure_icon,
                 _fmt(parameters.get("pressure_mbar")),
                 _fmt(parameters.get("altitude_m"), 1),
@@ -606,10 +651,11 @@ class TelegramNotifier:
         now = time.ticks_ms()
         state = light.label
         state = _effective_state(light)
-        issue_key = "%s:%s:%s" % (
+        issue_key = "%s:%s:%s:%s" % (
             state,
             light.temperature_label,
             light.humidity_label,
+            light.soil_label,
         )
 
         if state in ("warning", "alert"):

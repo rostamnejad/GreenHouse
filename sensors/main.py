@@ -1,4 +1,4 @@
-from machine import I2C, Pin
+from machine import ADC, I2C, Pin
 from time import sleep, sleep_ms, sleep_us
 import time
 import network
@@ -12,6 +12,11 @@ BMP280_CHANNEL = 0
 BMP280_ADDR = 0x76
 SHT20_CHANNEL = 1
 SHT20_ADDR = 0x40
+SOIL_MOISTURE_ENABLED = True
+SOIL_MOISTURE_PIN = 34
+SOIL_DRY_RAW = 3000
+SOIL_WET_RAW = 1200
+SOIL_SAMPLE_COUNT = 8
 
 TM1637_CLK = 27
 TM1637_DIO = 26
@@ -32,6 +37,15 @@ TIME_SYNC_INTERVAL_SECONDS = 3600
 CONTROLLER_HOST = "192.168.10.236"
 CONTROLLER_PORT = 80
 SEA_LEVEL_PRESSURE_MBAR = 1013.25
+
+
+def config_value(name, default):
+    try:
+        import secrets
+
+        return getattr(secrets, name, default)
+    except Exception:
+        return default
 
 
 class TCA9548A:
@@ -145,6 +159,61 @@ class BMP280:
             pressure_pa = pressure / 256
 
         return temp_c, pressure_pa / 100
+
+
+class SoilMoistureSensor:
+    def __init__(self):
+        self.enabled = config_value("SOIL_MOISTURE_ENABLED", SOIL_MOISTURE_ENABLED)
+        self.pin = int(config_value("SOIL_MOISTURE_PIN", SOIL_MOISTURE_PIN))
+        self.dry_raw = int(config_value("SOIL_DRY_RAW", SOIL_DRY_RAW))
+        self.wet_raw = int(config_value("SOIL_WET_RAW", SOIL_WET_RAW))
+        self.sample_count = max(1, int(config_value("SOIL_SAMPLE_COUNT", SOIL_SAMPLE_COUNT)))
+        self.adc = None
+
+        if not self.enabled:
+            print("SOIL_MOISTURE disabled")
+            return
+
+        self.adc = ADC(Pin(self.pin))
+        try:
+            self.adc.atten(ADC.ATTN_11DB)
+        except Exception:
+            pass
+        try:
+            self.adc.width(ADC.WIDTH_12BIT)
+        except Exception:
+            pass
+        print(
+            "SOIL_MOISTURE ready PIN=%d DRY_RAW=%d WET_RAW=%d"
+            % (self.pin, self.dry_raw, self.wet_raw)
+        )
+
+    def _percent_from_raw(self, raw):
+        if self.dry_raw == self.wet_raw:
+            return 0
+
+        if self.dry_raw > self.wet_raw:
+            percent = (self.dry_raw - raw) * 100 / (self.dry_raw - self.wet_raw)
+        else:
+            percent = (raw - self.dry_raw) * 100 / (self.wet_raw - self.dry_raw)
+
+        if percent < 0:
+            return 0
+        if percent > 100:
+            return 100
+        return percent
+
+    def read(self):
+        if self.adc is None:
+            return None, None
+
+        total = 0
+        for _ in range(self.sample_count):
+            total += self.adc.read()
+            sleep_ms(5)
+
+        raw = int(total / self.sample_count)
+        return self._percent_from_raw(raw), raw
 
 
 class TM1637:
@@ -349,14 +418,31 @@ def pressure_to_altitude_m(pressure_mbar):
 
 
 def send_parameters_to_controller(
-    temp_c, humidity, pressure_mbar, altitude_m, now, jy, jm, jd
+    temp_c,
+    humidity,
+    pressure_mbar,
+    altitude_m,
+    soil_moisture,
+    soil_raw,
+    now,
+    jy,
+    jm,
+    jd,
 ):
     sock = None
     try:
         import socket
 
+        soil_query = ""
+        if soil_moisture is not None and soil_raw is not None:
+            soil_query = "&soil_moisture=%.1f&soil_raw=%d" % (
+                soil_moisture,
+                soil_raw,
+            )
+
         request = (
             "GET /parameters?temp_c=%.2f&humidity=%.2f&pressure_mbar=%.2f&altitude_m=%.1f"
+            "%s"
             "&sensor_version=%d&hour=%d&minute=%d&second=%d&jy=%d&jm=%d&jd=%d HTTP/1.0\r\n"
             "Host: %s\r\n"
             "Connection: close\r\n"
@@ -366,6 +452,7 @@ def send_parameters_to_controller(
             humidity,
             pressure_mbar,
             altitude_m,
+            soil_query,
             APP_VERSION,
             now[3],
             now[4],
@@ -491,6 +578,7 @@ def main():
 
     mux.select(SHT20_CHANNEL)
     sensor = SHT20(i2c, SHT20_ADDR)
+    soil_sensor = SoilMoistureSensor()
     last_time_sync = 0
     last_ota_check_ms = time.ticks_ms()
     display.show_version(APP_VERSION)
@@ -517,14 +605,24 @@ def main():
 
             mux.select(BMP280_CHANNEL)
             _, pressure_mbar = pressure_sensor.read()
+            soil_moisture, soil_raw = soil_sensor.read()
             altitude_m = pressure_to_altitude_m(pressure_mbar)
             now = local_time()
             jy, jm, jd = gregorian_to_jalali(now[0], now[1], now[2])
             send_parameters_to_controller(
-                temp_c, humidity, pressure_mbar, altitude_m, now, jy, jm, jd
+                temp_c,
+                humidity,
+                pressure_mbar,
+                altitude_m,
+                soil_moisture,
+                soil_raw,
+                now,
+                jy,
+                jm,
+                jd,
             )
             print(
-                "TIME=%02d:%02d:%02d JDATE=%04d/%02d/%02d TEMP_C=%.2f HUMIDITY=%.2f PRESSURE_MBAR=%.2f ALTITUDE_M=%.1f"
+                "TIME=%02d:%02d:%02d JDATE=%04d/%02d/%02d TEMP_C=%.2f HUMIDITY=%.2f PRESSURE_MBAR=%.2f ALTITUDE_M=%.1f SOIL_MOISTURE=%s SOIL_RAW=%s"
                 % (
                     now[3],
                     now[4],
@@ -536,6 +634,8 @@ def main():
                     humidity,
                     pressure_mbar,
                     altitude_m,
+                    "--" if soil_moisture is None else "%.1f" % soil_moisture,
+                    "--" if soil_raw is None else "%d" % soil_raw,
                 )
             )
 
@@ -553,6 +653,9 @@ def main():
             else:
                 display.show("%4d" % pressure_value)
             sleep(3)
+            if soil_moisture is not None:
+                display.show("S%3d" % int(round(soil_moisture)))
+                sleep(3)
             display.show("ALT ")
             sleep(1)
             display.show("%4d" % int(round(altitude_m)))

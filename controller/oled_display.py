@@ -34,6 +34,11 @@ SHORT_LABELS = {
     "low_humidity": "LOW",
     "humid": "HUMID",
     "too_humid": "HUMID!",
+    "soil_critical_dry": "SDRY!",
+    "soil_dry": "SDRY",
+    "soil_good": "OK",
+    "soil_wet": "SWET",
+    "soil_too_wet": "SWET!",
 }
 
 
@@ -176,6 +181,9 @@ class OledStatusDisplay:
     def _is_humidity_issue(self, light):
         return light.humidity is not None and light.humidity_label != "humidity_good"
 
+    def _is_soil_issue(self, light):
+        return light.soil_moisture is not None and light.soil_label != "soil_good"
+
     def show_message(self, title, message=""):
         if not self.available:
             return
@@ -204,8 +212,10 @@ class OledStatusDisplay:
             temp = self._float_value(parameters.get("temp_c"), 1)
             humidity = self._float_value(light.humidity, 1)
             pressure = self._float_value(parameters.get("pressure_mbar"), 0)
+            soil = self._float_value(light.soil_moisture, 1)
             temp_issue = self._is_temp_issue(light)
             humidity_issue = self._is_humidity_issue(light)
+            soil_issue = self._is_soil_issue(light)
             pressure_issue = parameters.get("pressure_mbar") is None
             link_issue = light.sensor_link_label() != "sensor_ok"
             state_issue = light.effective_label() not in ("good", "sensor_ok")
@@ -231,11 +241,20 @@ class OledStatusDisplay:
             )
             self._metric_row(5, "P", "%smbar" % pressure, "", pressure_issue)
             self._metric_row(
-                6, "LINK", self._short_label(light.sensor_link_label()), "", link_issue
+                6,
+                "S",
+                "%s%%" % soil,
+                self._short_label(light.soil_label),
+                soil_issue,
             )
-            self._metric_row(
-                7, "STATE", self._short_label(light.effective_label()), "", state_issue
-            )
+            if link_issue:
+                self._metric_row(
+                    7, "LINK", self._short_label(light.sensor_link_label()), "", True
+                )
+            else:
+                self._metric_row(
+                    7, "STATE", self._short_label(light.effective_label()), "", state_issue
+                )
             self.display.show()
             self.last_update_ms = now
         except Exception as exc:

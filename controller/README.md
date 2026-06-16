@@ -17,7 +17,7 @@ Hold BOOT, tap RESET/EN, then release BOOT before uploading firmware or files.
 Serial parameter output:
 - Sensor board sends readings to `GET /parameters`.
 - Controller prints one USB serial line per update, for example:
-  `PARAMETERS TIME=21:45:08 JDATE=1405/03/25 TEMP_C=31.20 HUMIDITY=38.10 PRESSURE_MBAR=863.12 ALTITUDE_M=1332.4 TEMP_STATE=warm HUMIDITY_STATE=low_humidity STATE=warning`
+  `PARAMETERS TIME=21:45:08 JDATE=1405/03/25 TEMP_C=31.20 HUMIDITY=38.10 SOIL_MOISTURE=42.5 SOIL_RAW=2235 PRESSURE_MBAR=863.12 ALTITUDE_M=1332.4 TEMP_STATE=warm HUMIDITY_STATE=low_humidity SOIL_STATE=soil_good STATE=warning`
 - `GET /status` returns the latest values as plain text.
 - `ALTITUDE_M` is a barometric estimate from BMP280 pressure using sea-level pressure `1013.25 mbar`; weather changes can move it.
 
@@ -29,21 +29,29 @@ RGB climate state:
 - Temperature and humidity use independent RGB status colors.
 - Temperature: cold is blue/cyan, warm is orange, hot is red.
 - Humidity: low/dry is orange/red, humid is blue, too humid is purple.
-- If temperature and humidity both need attention, the RGB alternates between their independent colors.
-- Critical temperature or humidity blinks its own color.
+- Soil moisture: dry is orange/red, too wet is purple/blue.
+- If multiple readings need attention, the RGB alternates between their independent colors.
+- Critical temperature, humidity, or soil moisture blinks its own color.
 - Sensor timeout: if no reading arrives for 90 seconds, controller reports `sensor_lost`.
 - Temperature healthy range: 18-28 C.
 - Humidity healthy range: 45-70%.
 
 OLED status display:
 - The controller supports a 0.96 inch SSD1306 SPI OLED with pins labeled `GND VCC D0 D1 RES DC CS`.
-- The OLED shows live time with seconds, Jalali date with year, temperature, humidity, barometric pressure, sensor link, and overall state.
+- The OLED shows live time with seconds, Jalali date with year, temperature, air humidity, barometric pressure, soil moisture, and overall state.
 - The OLED is monochrome, so error rows are highlighted with an inverted row and `!` marker instead of red text.
 - Recommended wiring:
   `GND -> GND`, `VCC -> 3V3`, `D0 -> GPIO12`, `D1 -> GPIO11`, `RES -> GPIO9`, `DC -> GPIO10`, `CS -> GPIO8`.
 - Upload `ssd1306.py` and `oled_display.py` to the controller board along with `main.py`.
 - Change the `OLED_*` values in local `secrets.py` if you use different pins.
 - Set `OLED_ENABLED = False` to run without the display.
+
+Soil moisture sensor:
+- The sensor board supports a capacitive soil moisture sensor v2.0 with pins labeled `GND VCC AOUT`.
+- Recommended wiring on the sensor board:
+  `GND -> GND`, `VCC -> 3V3`, `AOUT -> GPIO34`.
+- GPIO34 is an ADC1 input pin on classic ESP32 boards, so it works while WiFi is active.
+- Calibrate `SOIL_DRY_RAW` and `SOIL_WET_RAW` in the sensor board's local `secrets.py` after installation.
 
 Telegram notifications:
 - Add `TELEGRAM_ENABLED = True`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_CHAT_ID` to the controller board's local `secrets.py`.

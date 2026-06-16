@@ -13,3 +13,20 @@ OTA_REQUIRES_TOKEN = False
 
 # Keep this False unless you deliberately want OTA to replace boot.py.
 OTA_ALLOW_BOOT_UPDATE = False
+
+# Capacitive soil moisture sensor v2.0 on an ESP32 ADC1 pin.
+# Wiring:
+# Sensor GND  -> ESP32 GND
+# Sensor VCC  -> ESP32 3V3
+# Sensor AOUT -> ESP32 GPIO34
+# Keep this on ADC1 pins on classic ESP32 because ADC2 conflicts with WiFi.
+SOIL_MOISTURE_ENABLED = True
+SOIL_MOISTURE_PIN = 34
+SOIL_SAMPLE_COUNT = 8
+
+# Calibrate these after installation:
+# 1. Read SOIL_RAW with the probe in dry soil/air and set SOIL_DRY_RAW.
+# 2. Read SOIL_RAW with the probe in wet soil/water and set SOIL_WET_RAW.
+# Most capacitive probes read higher when dry and lower when wet.
+SOIL_DRY_RAW = 3000
+SOIL_WET_RAW = 1200

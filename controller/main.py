@@ -26,6 +26,8 @@ SENSOR_LINK_CHECK_INTERVAL_MS = 5000
 PARAMETER_KEYS = (
     "temp_c",
     "humidity",
+    "soil_moisture",
+    "soil_raw",
     "pressure_mbar",
     "altitude_m",
     "sensor_version",
@@ -43,8 +45,10 @@ class HumidityLight:
         self.led = NeoPixel(Pin(pin, Pin.OUT), count)
         self.temp_c = None
         self.humidity = None
+        self.soil_moisture = None
         self.temperature_label = "waiting"
         self.humidity_label = "waiting"
+        self.soil_label = "waiting"
         self.label = "waiting"
         self.severity = 0
         self.base_color = (40, 40, 40)
@@ -52,6 +56,8 @@ class HumidityLight:
         self.temp_severity = 0
         self.humidity_color = (40, 40, 40)
         self.humidity_severity = 0
+        self.soil_color = (40, 40, 40)
+        self.soil_severity = 0
         self.updated_ms = time.ticks_ms()
         self.has_reading = False
         self.transient_event = ""
@@ -94,6 +100,19 @@ class HumidityLight:
             return "humid", 0.45, (0, 80, 255)
         return "too_humid", 1.0, (190, 0, 255)
 
+    def _soil_condition(self, value):
+        if value is None:
+            return "waiting", 0, (40, 40, 40)
+        if value < 15:
+            return "soil_critical_dry", 1.0, (255, 0, 0)
+        if value < 35:
+            return "soil_dry", 0.7, (255, 90, 0)
+        if value <= 80:
+            return "soil_good", 0, (0, 200, 0)
+        if value <= 90:
+            return "soil_wet", 0.45, (0, 80, 255)
+        return "soil_too_wet", 0.8, (160, 0, 255)
+
     def _mix_conditions(self, temp_color, temp_severity, humidity_color, humidity_severity):
         if self.temp_c is None and self.humidity is None:
             return (40, 40, 40)
@@ -125,12 +144,15 @@ class HumidityLight:
 
         return (int(red / total), int(green / total), int(blue / total))
 
-    def set_conditions(self, temp_c=None, humidity=None, log=True):
+    def set_conditions(self, temp_c=None, humidity=None, soil_moisture=None, log=True):
         if temp_c is not None:
             self.temp_c = temp_c
             self.has_reading = True
         if humidity is not None:
             self.humidity = humidity
+            self.has_reading = True
+        if soil_moisture is not None:
+            self.soil_moisture = soil_moisture
             self.has_reading = True
         self.updated_ms = time.ticks_ms()
 
@@ -138,22 +160,28 @@ class HumidityLight:
         humidity_label, humidity_severity, humidity_color = self._humidity_condition(
             self.humidity
         )
+        soil_label, soil_severity, soil_color = self._soil_condition(self.soil_moisture)
 
         self.temperature_label = temp_label
         self.humidity_label = humidity_label
+        self.soil_label = soil_label
         self.temp_color = temp_color
         self.temp_severity = temp_severity
         self.humidity_color = humidity_color
         self.humidity_severity = humidity_severity
-        self.severity = max(temp_severity, humidity_severity)
+        self.soil_color = soil_color
+        self.soil_severity = soil_severity
+        self.severity = max(temp_severity, humidity_severity, soil_severity)
         if self.severity == 0:
             self.base_color = (0, 200, 0)
-        elif temp_severity >= humidity_severity:
+        elif temp_severity >= humidity_severity and temp_severity >= soil_severity:
             self.base_color = temp_color
-        else:
+        elif humidity_severity >= soil_severity:
             self.base_color = humidity_color
+        else:
+            self.base_color = soil_color
 
-        if self.temp_c is None and self.humidity is None:
+        if self.temp_c is None and self.humidity is None and self.soil_moisture is None:
             self.label = "waiting"
         elif self.severity == 0:
             self.label = "good"
@@ -164,12 +192,14 @@ class HumidityLight:
 
         if log:
             print(
-                "CLIMATE TEMP_C=%s HUMIDITY=%s TEMP_STATE=%s HUMIDITY_STATE=%s STATE=%s"
+                "CLIMATE TEMP_C=%s HUMIDITY=%s SOIL_MOISTURE=%s TEMP_STATE=%s HUMIDITY_STATE=%s SOIL_STATE=%s STATE=%s"
                 % (
                     self.temp_c,
                     self.humidity,
+                    self.soil_moisture,
                     self.temperature_label,
                     self.humidity_label,
+                    self.soil_label,
                     self.label,
                 )
             )
@@ -227,6 +257,8 @@ class HumidityLight:
             colors.append((self.temp_color, self.temp_severity))
         if self.humidity is not None and self.humidity_severity > 0:
             colors.append((self.humidity_color, self.humidity_severity))
+        if self.soil_moisture is not None and self.soil_severity > 0:
+            colors.append((self.soil_color, self.soil_severity))
         return colors
 
     def animate(self):
@@ -296,11 +328,26 @@ def parse_parameters(path):
         query = parse_query(path)
         parameters = {}
 
-        for key in ("temp_c", "humidity", "pressure_mbar", "altitude_m"):
+        for key in (
+            "temp_c",
+            "humidity",
+            "soil_moisture",
+            "pressure_mbar",
+            "altitude_m",
+        ):
             if key in query:
                 parameters[key] = float(query[key])
 
-        for key in ("sensor_version", "hour", "minute", "second", "jy", "jm", "jd"):
+        for key in (
+            "sensor_version",
+            "soil_raw",
+            "hour",
+            "minute",
+            "second",
+            "jy",
+            "jm",
+            "jd",
+        ):
             if key in query:
                 parameters[key] = int(query[key])
 
@@ -349,6 +396,14 @@ def status_body(parameters, light):
     if light.humidity is not None:
         humidity_value = "%.2f" % light.humidity
 
+    soil_value = "None"
+    if light.soil_moisture is not None:
+        soil_value = "%.1f" % light.soil_moisture
+
+    soil_raw_value = "None"
+    if parameters["soil_raw"] is not None:
+        soil_raw_value = "%d" % parameters["soil_raw"]
+
     pressure_value = "None"
     if parameters["pressure_mbar"] is not None:
         pressure_value = "%.2f" % parameters["pressure_mbar"]
@@ -362,20 +417,24 @@ def status_body(parameters, light):
         sensor_version = "%d" % parameters["sensor_version"]
 
     return (
-        "time=%s jdate=%s temp_c=%s humidity=%s pressure_mbar=%s altitude_m=%s "
+        "time=%s jdate=%s temp_c=%s humidity=%s soil_moisture=%s soil_raw=%s "
+        "pressure_mbar=%s altitude_m=%s "
         "controller_version=%d sensor_version=%s temp_state=%s humidity_state=%s "
-        "sensor_link=%s sensor_age_s=%s state=%s"
+        "soil_state=%s sensor_link=%s sensor_age_s=%s state=%s"
         % (
             time_value,
             date_value,
             temp_value,
             humidity_value,
+            soil_value,
+            soil_raw_value,
             pressure_value,
             altitude_value,
             APP_VERSION,
             sensor_version,
             light.temperature_label,
             light.humidity_label,
+            light.soil_label,
             light.sensor_link_label(),
             light.sensor_age_seconds(),
             light.effective_label(),
@@ -409,6 +468,12 @@ def print_serial_parameters(parameters, light):
     if light.humidity is not None:
         parts.append("HUMIDITY=%.2f" % light.humidity)
 
+    if light.soil_moisture is not None:
+        parts.append("SOIL_MOISTURE=%.1f" % light.soil_moisture)
+
+    if parameters["soil_raw"] is not None:
+        parts.append("SOIL_RAW=%d" % parameters["soil_raw"])
+
     if parameters["pressure_mbar"] is not None:
         parts.append("PRESSURE_MBAR=%.2f" % parameters["pressure_mbar"])
 
@@ -421,6 +486,7 @@ def print_serial_parameters(parameters, light):
 
     parts.append("TEMP_STATE=%s" % light.temperature_label)
     parts.append("HUMIDITY_STATE=%s" % light.humidity_label)
+    parts.append("SOIL_STATE=%s" % light.soil_label)
     parts.append("SENSOR_LINK=%s" % light.sensor_link_label())
     if light.sensor_age_seconds() is not None:
         parts.append("SENSOR_AGE_S=%d" % light.sensor_age_seconds())
@@ -596,10 +662,15 @@ def main():
                         parameters["pressure_mbar"]
                     )
 
-                if parameters["temp_c"] is not None or parameters["humidity"] is not None:
+                if (
+                    parameters["temp_c"] is not None
+                    or parameters["humidity"] is not None
+                    or parameters["soil_moisture"] is not None
+                ):
                     light.set_conditions(
                         temp_c=parameters["temp_c"],
                         humidity=parameters["humidity"],
+                        soil_moisture=parameters["soil_moisture"],
                         log=False,
                     )
 
