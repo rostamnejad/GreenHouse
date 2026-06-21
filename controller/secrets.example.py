@@ -8,8 +8,9 @@ WIFI_SUBNET_MASK = "255.255.255.0"
 WIFI_GATEWAY = ""
 WIFI_DNS = ""
 
-# Default controller-side soil sensor state. Telegram commands can override it.
-SOIL_MOISTURE_ENABLED = True
+# Soil moisture is optional and stays off until the probe is installed/calibrated.
+# Telegram commands can override the controller state.
+SOIL_MOISTURE_ENABLED = False
 
 OTA_DEVICE = "controller"
 OTA_ENABLED = True

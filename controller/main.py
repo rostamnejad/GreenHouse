@@ -28,6 +28,19 @@ WIFI_CONNECT_TIMEOUT_MS = 10000
 OTA_STARTUP_DELAY_MS = 15000
 HTTP_CLIENT_TIMEOUT_SECONDS = 2
 SOIL_STATE_FILE = "soil_enabled.txt"
+SOIL_MOISTURE_DEFAULT_ENABLED = False
+RGB_DIRECT_LEVEL = 0.16
+RGB_OK_MIN_LEVEL = 0.02
+RGB_OK_MAX_LEVEL = 0.08
+RGB_WARNING_MIN_LEVEL = 0.04
+RGB_WARNING_MAX_LEVEL = 0.12
+RGB_ALERT_MIN_LEVEL = 0.06
+RGB_ALERT_MAX_LEVEL = 0.16
+RGB_SENSOR_LOST_MIN_LEVEL = 0.02
+RGB_SENSOR_LOST_MAX_LEVEL = 0.12
+RGB_PULSE_PERIOD_MS = 2400
+RGB_ALERT_PULSE_PERIOD_MS = 3200
+RGB_TRANSIENT_PULSE_MS = 1800
 PARAMETER_KEYS = (
     "temp_c",
     "humidity",
@@ -45,6 +58,19 @@ PARAMETER_KEYS = (
     "jd",
 )
 _UNSET = object()
+PROFILE_NAME = "mixed_greenhouse"
+TEMP_ALERT_COLD_C = 14
+TEMP_LOW_C = 18
+TEMP_TARGET_MIN_C = 22
+TEMP_TARGET_MAX_C = 27
+TEMP_NOTICE_HIGH_C = 29
+TEMP_ALERT_HOT_C = 33
+HUMIDITY_CRITICAL_DRY_PERCENT = 35
+HUMIDITY_LOW_PERCENT = 42
+HUMIDITY_TARGET_MIN_PERCENT = 45
+HUMIDITY_TARGET_MAX_PERCENT = 55
+HUMIDITY_NOTICE_HIGH_PERCENT = 60
+HUMIDITY_MOLD_RISK_PERCENT = 70
 
 
 class HumidityLight:
@@ -53,7 +79,7 @@ class HumidityLight:
         self.temp_c = None
         self.humidity = None
         self.soil_moisture = None
-        self.soil_enabled = True
+        self.soil_enabled = SOIL_MOISTURE_DEFAULT_ENABLED
         self.temperature_label = "waiting"
         self.humidity_label = "waiting"
         self.soil_label = "waiting"
@@ -77,34 +103,36 @@ class HumidityLight:
         self.led.write()
 
     def show_color(self, color):
-        self.led[0] = color
+        self.led[0] = self._scale(color, RGB_DIRECT_LEVEL)
         self.led.write()
 
     def _temperature_condition(self, value):
         if value is None:
             return "waiting", 0, (8, 8, 8)
-        if value < 12:
+        if value < TEMP_ALERT_COLD_C:
             return "too_cold", 1.0, (0, 15, 110)
-        if value < 18:
+        if value < TEMP_LOW_C:
             return "cold", 0.6, (0, 65, 100)
-        if value <= 28:
+        if value <= TEMP_TARGET_MAX_C:
             return "temp_good", 0, (0, 75, 20)
-        if value <= 32:
+        if value <= TEMP_NOTICE_HIGH_C:
+            return "warm", 0.35, (110, 55, 0)
+        if value <= TEMP_ALERT_HOT_C:
             return "warm", 0.45, (110, 55, 0)
         return "hot", 1.0, (120, 0, 0)
 
     def _humidity_condition(self, value):
         if value is None:
             return "waiting", 0, (8, 8, 8)
-        if value < 30:
+        if value < HUMIDITY_CRITICAL_DRY_PERCENT:
             return "critical_dry", 1.0, (120, 0, 0)
-        if value < 35:
+        if value < HUMIDITY_LOW_PERCENT:
             return "dry", 0.65, (90, 74, 0)
-        if value < 45:
+        if value < HUMIDITY_TARGET_MIN_PERCENT:
             return "low_humidity", 0.45, (82, 70, 0)
-        if value <= 70:
+        if value <= HUMIDITY_NOTICE_HIGH_PERCENT:
             return "humidity_good", 0, (0, 75, 20)
-        if value <= 85:
+        if value <= HUMIDITY_MOLD_RISK_PERCENT:
             return "humid", 0.45, (82, 70, 0)
         return "too_humid", 1.0, (120, 0, 0)
 
@@ -229,7 +257,28 @@ class HumidityLight:
         self.set_conditions(soil_moisture=None if not self.soil_enabled else _UNSET, log=log)
 
     def _scale(self, color, level):
-        return tuple(int(component * level) for component in color)
+        if level < 0:
+            level = 0
+        if level > 1:
+            level = 1
+        return tuple(max(0, min(255, int(component * level))) for component in color)
+
+    def _pulse_level(self, now, min_level, max_level, period_ms=RGB_PULSE_PERIOD_MS):
+        if max_level < min_level:
+            max_level = min_level
+        wave = (1 + math.sin(6.2831853 * (now % period_ms) / period_ms)) / 2
+        return min_level + (max_level - min_level) * wave
+
+    def _soft_pulse(self, color, now, min_level, max_level, period_ms=RGB_PULSE_PERIOD_MS):
+        return self._scale(color, self._pulse_level(now, min_level, max_level, period_ms))
+
+    def _dominant_condition(self, condition_colors):
+        selected_color, selected_severity = condition_colors[0]
+        for color, severity in condition_colors[1:]:
+            if severity > selected_severity:
+                selected_color = color
+                selected_severity = severity
+        return selected_color, selected_severity
 
     def show_transient(self, event, duration_ms=1500):
         self.transient_event = event
@@ -237,11 +286,13 @@ class HumidityLight:
 
     def _animate_transient(self, now):
         if self.transient_event == "telegram_sent":
-            phase = (now // 130) % 8
-            self.led[0] = (0, 95, 22) if phase in (0, 2, 4, 6) else (0, 0, 0)
+            self.led[0] = self._soft_pulse(
+                (0, 95, 22), now, 0.02, RGB_DIRECT_LEVEL, RGB_TRANSIENT_PULSE_MS
+            )
         elif self.transient_event == "telegram_failed":
-            phase = (now // 160) % 6
-            self.led[0] = (120, 0, 0) if phase in (0, 2) else (0, 0, 0)
+            self.led[0] = self._soft_pulse(
+                (120, 0, 0), now, 0.03, RGB_DIRECT_LEVEL, RGB_TRANSIENT_PULSE_MS
+            )
         else:
             self.led[0] = (0, 0, 0)
 
@@ -264,13 +315,13 @@ class HumidityLight:
         return self.label
 
     def _animate_sensor_missing(self, now):
-        phase = (now // 180) % 12
-        if phase in (0, 2):
-            self.led[0] = (120, 0, 0)
-        elif phase in (1, 3):
-            self.led[0] = (0, 0, 0)
-        else:
-            self.led[0] = (12, 0, 0)
+        self.led[0] = self._soft_pulse(
+            (120, 0, 0),
+            now,
+            RGB_SENSOR_LOST_MIN_LEVEL,
+            RGB_SENSOR_LOST_MAX_LEVEL,
+            RGB_ALERT_PULSE_PERIOD_MS,
+        )
 
     def _active_condition_colors(self):
         colors = []
@@ -292,19 +343,23 @@ class HumidityLight:
         else:
             condition_colors = self._active_condition_colors()
             if condition_colors:
-                if len(condition_colors) == 1:
-                    color, severity = condition_colors[0]
+                color, severity = self._dominant_condition(condition_colors)
+                if severity >= 0.9:
+                    self.led[0] = self._soft_pulse(
+                        color,
+                        now,
+                        RGB_ALERT_MIN_LEVEL,
+                        RGB_ALERT_MAX_LEVEL,
+                        RGB_ALERT_PULSE_PERIOD_MS,
+                    )
                 else:
-                    color, severity = condition_colors[(now // 900) % len(condition_colors)]
-
-                if severity >= 0.9 and (now // 280) % 2 == 1:
-                    self.led[0] = (0, 0, 0)
-                else:
-                    pulse = 0.18 + 0.72 * (1 + math.sin(now / 650)) / 2
-                    self.led[0] = self._scale(color, pulse)
+                    self.led[0] = self._soft_pulse(
+                        color, now, RGB_WARNING_MIN_LEVEL, RGB_WARNING_MAX_LEVEL
+                    )
             else:
-                pulse = 0.12 + 0.38 * (1 + math.sin(now / 850)) / 2
-                self.led[0] = self._scale((0, 75, 20), pulse)
+                self.led[0] = self._soft_pulse(
+                    (0, 75, 20), now, RGB_OK_MIN_LEVEL, RGB_OK_MAX_LEVEL
+                )
 
         self.led.write()
 
@@ -361,7 +416,7 @@ def load_soil_enabled():
         with open(SOIL_STATE_FILE, "r") as file:
             return file.read().strip() != "0"
     except Exception:
-        return bool(config_value("SOIL_MOISTURE_ENABLED", True))
+        return SOIL_MOISTURE_DEFAULT_ENABLED
 
 
 def save_soil_enabled(enabled):
@@ -382,9 +437,9 @@ def apply_soil_enabled(enabled, parameters, light, persist=False):
 
 def soil_command_response(enabled):
     return (
-        "Soil moisture sensor: enabled"
+        "سنسور رطوبت خاک: فعال"
         if enabled
-        else "Soil moisture sensor: disabled"
+        else "سنسور رطوبت خاک: غیرفعال\nعدد خاک از وضعیت کلی و هشدارها حذف شد."
     )
 
 
@@ -598,13 +653,16 @@ def status_body(parameters, light):
         sensor_version = "%d" % parameters["sensor_version"]
 
     return (
-        "time=%s jdate=%s temp_c=%s humidity=%s soil_enabled=%d "
+        "profile=%s time=%s jdate=%s temp_c=%s humidity=%s soil_enabled=%d "
         "soil_moisture=%s soil_raw=%s "
         "pressure_mbar=%s altitude_m=%s "
+        "temp_good_c=%d-%d temp_target_day_c=%d-%d "
+        "humidity_target=%d-%d humidity_notice_high=%d humidity_mold_risk=%d "
         "controller_version=%d sensor_version=%s temp_state=%s humidity_state=%s "
         "soil_state=%s temp_color=%s humidity_color=%s soil_color=%s status_color=%s "
         "sensor_link=%s sensor_age_s=%s state=%s"
         % (
+            PROFILE_NAME,
             time_value,
             date_value,
             temp_value,
@@ -614,6 +672,14 @@ def status_body(parameters, light):
             soil_raw_value,
             pressure_value,
             altitude_value,
+            TEMP_LOW_C,
+            TEMP_TARGET_MAX_C,
+            TEMP_TARGET_MIN_C,
+            TEMP_TARGET_MAX_C,
+            HUMIDITY_TARGET_MIN_PERCENT,
+            HUMIDITY_TARGET_MAX_PERCENT,
+            HUMIDITY_NOTICE_HIGH_PERCENT,
+            HUMIDITY_MOLD_RISK_PERCENT,
             APP_VERSION,
             sensor_version,
             light.temperature_label,
@@ -746,11 +812,11 @@ def next_ota_check_ms(delay_ms=None):
 
 def show_activation(light):
     print("RGB activation ready")
-    for _ in range(8):
+    for _ in range(2):
         light.show_color((0, 80, 20))
-        time.sleep_ms(120)
+        time.sleep_ms(220)
         light.off()
-        time.sleep_ms(120)
+        time.sleep_ms(220)
 
 
 def telegram_status(light, event):

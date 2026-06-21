@@ -18,13 +18,13 @@ OTA_REQUIRES_TOKEN = False
 # Keep this False unless you deliberately want OTA to replace boot.py.
 OTA_ALLOW_BOOT_UPDATE = False
 
-# Capacitive soil moisture sensor v2.0 on an ESP32 ADC1 pin.
+# Optional capacitive soil moisture sensor v2.0 on an ESP32 ADC1 pin.
 # Wiring:
 # Sensor GND  -> ESP32 GND
 # Sensor VCC  -> ESP32 3V3
 # Sensor AOUT -> ESP32 GPIO34
 # Keep this on ADC1 pins on classic ESP32 because ADC2 conflicts with WiFi.
-SOIL_MOISTURE_ENABLED = True
+SOIL_MOISTURE_ENABLED = False
 SOIL_MOISTURE_PIN = 34
 SOIL_SAMPLE_COUNT = 8
 SOIL_RAW_MIN_VALID = 100

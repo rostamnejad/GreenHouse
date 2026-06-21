@@ -27,19 +27,20 @@ WiFi addressing:
 - Set the same controller IP in the sensor board's local `secrets.py` as `CONTROLLER_HOST`.
 
 RGB climate state:
-- Fast green blinks: Telegram message was sent successfully, then RGB returns to the live status mode.
-- Short red blinks: Telegram message send failed.
-- Red double-blink: sensor board is not sending data or the last reading is stale.
-- Green pulse: temperature and humidity are both in the healthy range.
+- The RGB status LED uses a dim slow pulse to avoid eye strain.
+- Soft green pulse: temperature and humidity are both in the healthy range.
+- Soft orange/blue/red pulse: one reading needs attention.
+- Slow red pulse: sensor board is not sending data, the last reading is stale, or an alert is active.
+- Telegram sent/failed indicators use a short soft pulse, then RGB returns to live status mode.
 - Temperature and humidity use independent RGB status colors.
 - Temperature: cold is blue/cyan, warm is orange, hot is red.
 - Humidity: warning dry/low/high is yellow, critical dry or too humid is red.
 - Soil moisture: wet warning is yellow, dry/critical/too wet is red.
-- If multiple readings need attention, the RGB alternates between their independent colors.
-- Critical temperature, humidity, or soil moisture blinks its own color.
+- If multiple readings need attention, the RGB shows the most severe condition instead of rapid color switching.
 - Sensor timeout: if no reading arrives for 90 seconds, controller reports `sensor_lost`.
-- Temperature healthy range: 18-28 C.
-- Humidity healthy range: 45-70%.
+- Mixed greenhouse profile: aloe/sansevieria plus citrus and young palms.
+- Temperature good range: 18-27 C; day target shown in Telegram: 22-27 C.
+- Humidity target: 45-55%; attention above 60%; mold/fungus risk above 70%.
 
 OLED status display:
 - The controller supports a 0.96 inch SSD1306 SPI OLED with pins labeled `GND VCC D0 D1 RES DC CS`.
@@ -53,6 +54,8 @@ OLED status display:
 - Set `OLED_ENABLED = False` to run without the display.
 
 Soil moisture sensor:
+- Soil moisture is optional and is disabled by default so an unconnected or uncalibrated probe cannot show `100%` and force `STATE=ALERT`.
+- If the OLED shows `SOIL 100.0%` without a real calibrated probe, send `/soil_off` in Telegram or remove `soil_enabled.txt` from the controller board, then reboot.
 - The sensor board supports a capacitive soil moisture sensor v2.0 with pins labeled `GND VCC AOUT`.
 - Recommended wiring on the sensor board:
   `GND -> GND`, `VCC -> 3V3`, `AOUT -> GPIO34`.
@@ -62,7 +65,8 @@ Soil moisture sensor:
 Telegram notifications:
 - Add `TELEGRAM_ENABLED = True`, `TELEGRAM_BOT_TOKEN`, and `TELEGRAM_CHAT_ID` to the controller board's local `secrets.py`.
 - Telegram report sections use professional Persian text with colored emoji markers: green is healthy, orange needs attention, red needs immediate checking.
-- Telegram sends a warning/alert message when temperature or humidity leaves the healthy range.
+- Telegram is currently monitor-only: messages provide manual guidance and do not imply that a fan, heater, or humidifier was switched.
+- Telegram sends a warning/alert message when temperature or humidity leaves the mixed-greenhouse profile range.
 - It sends a recovery message when the greenhouse returns to healthy range.
 - It sends sensor link messages when the sensor board stops sending data or starts sending again.
 - Send `/status` or `/report` to the bot to get the latest controller reading on demand.

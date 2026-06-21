@@ -10,10 +10,20 @@ DEFAULT_SENSOR_WAIT_NOTICE_SECONDS = 90
 DEFAULT_REQUEST_TIMEOUT_SECONDS = 5
 DEFAULT_FAILURE_BACKOFF_SECONDS = 60
 REQUEST_USER_AGENT = "GreenHouse-Telegram"
-TEMP_MIN_C = 18.0
-TEMP_MAX_C = 28.0
-HUMIDITY_MIN_PERCENT = 45.0
-HUMIDITY_MAX_PERCENT = 70.0
+PROFILE_TITLE = "گلخانه مخلوط"
+PROFILE_DESCRIPTION = "آلوئه/سانسوریا + مرکبات و نخل جوان"
+TEMP_SAFE_MIN_C = 18.0
+TEMP_TARGET_MIN_C = 22.0
+TEMP_TARGET_MAX_C = 27.0
+TEMP_NOTICE_HIGH_C = 29.0
+TEMP_ALERT_COLD_C = 14.0
+TEMP_ALERT_HOT_C = 33.0
+HUMIDITY_TARGET_MIN_PERCENT = 45.0
+HUMIDITY_TARGET_MAX_PERCENT = 55.0
+HUMIDITY_LOW_PERCENT = 42.0
+HUMIDITY_CRITICAL_DRY_PERCENT = 35.0
+HUMIDITY_NOTICE_HIGH_PERCENT = 60.0
+HUMIDITY_MOLD_RISK_PERCENT = 70.0
 SOIL_MIN_PERCENT = 35.0
 SOIL_MAX_PERCENT = 80.0
 LABEL_TEXT = {
@@ -157,27 +167,90 @@ def _range_position(value, low, high, unit):
     return "در محدوده سالم"
 
 
+def _temperature_position(value):
+    if value is None:
+        return "داده‌ای دریافت نشده"
+    if value < TEMP_ALERT_COLD_C:
+        return "زیر حد امن؛ سرما برای این ترکیب گیاه‌ها ریسکی است"
+    if value < TEMP_SAFE_MIN_C:
+        return "سردتر از بازه امن"
+    if value < TEMP_TARGET_MIN_C:
+        return "امن است، ولی از هدف روز کمی پایین‌تر است"
+    if value <= TEMP_TARGET_MAX_C:
+        return "در هدف روز"
+    if value <= TEMP_NOTICE_HIGH_C:
+        return "کمی بالاتر از هدف روز"
+    if value <= TEMP_ALERT_HOT_C:
+        return "گرم؛ تهویه و سایه ملایم را بررسی کن"
+    return "خیلی گرم؛ نیاز به بررسی فوری"
+
+
+def _humidity_position(value):
+    if value is None:
+        return "داده‌ای دریافت نشده"
+    if value < HUMIDITY_CRITICAL_DRY_PERCENT:
+        return "خیلی خشک"
+    if value < HUMIDITY_LOW_PERCENT:
+        return "خشک"
+    if value < HUMIDITY_TARGET_MIN_PERCENT:
+        return "کمی پایین‌تر از هدف"
+    if value <= HUMIDITY_TARGET_MAX_PERCENT:
+        return "در هدف مناسب"
+    if value <= HUMIDITY_NOTICE_HIGH_PERCENT:
+        return "کمی بالاتر از هدف؛ هنوز قابل قبول"
+    if value <= HUMIDITY_MOLD_RISK_PERCENT:
+        return "مرطوب؛ برای ساکولنت‌ها زیاد است"
+    return "ریسک کپک و قارچ"
+
+
 def _temperature_action(value):
     if value is None:
         return "منتظر خواندن دما بمان."
-    if value < TEMP_MIN_C:
-        return "دما را حدود %.1f درجه بالا ببر." % (TEMP_MIN_C - value)
-    if value > TEMP_MAX_C:
-        return "دما را حدود %.1f درجه کاهش بده." % (value - TEMP_MAX_C)
+    if value < TEMP_ALERT_COLD_C:
+        return "دما خیلی پایین است؛ گلدان‌ها را از کف و دیوار سرد دورتر کن."
+    if value < TEMP_SAFE_MIN_C:
+        return "دما سرد است؛ اگر می‌شود محیط را به بالای %.0f C برسان." % (
+            TEMP_SAFE_MIN_C
+        )
+    if value < TEMP_TARGET_MIN_C:
+        return "دما امن است، ولی برای رشد بهتر روزها نزدیک %.0f-%.0f C بهتر است." % (
+            TEMP_TARGET_MIN_C,
+            TEMP_TARGET_MAX_C,
+        )
+    if value > TEMP_ALERT_HOT_C:
+        return "دما خیلی بالا رفته؛ تهویه، فاصله از منبع گرما و سایه ملایم را بررسی کن."
+    if value > TEMP_NOTICE_HIGH_C:
+        return "دما گرم است؛ اگر هوا ساکن است کمی تهویه بده."
+    if value > TEMP_TARGET_MAX_C:
+        return "دما کمی بالاتر از هدف است؛ فعلا پایش کافی است."
     return ""
 
 
 def _humidity_action(value):
     if value is None:
         return "منتظر خواندن رطوبت بمان."
-    if value < HUMIDITY_MIN_PERCENT:
-        return "رطوبت را حدود %.1f درصد بالا ببر." % (
-            HUMIDITY_MIN_PERCENT - value
-        )
-    if value > HUMIDITY_MAX_PERCENT:
-        return "رطوبت را حدود %.1f درصد کاهش بده." % (
-            value - HUMIDITY_MAX_PERCENT
-        )
+    if value < HUMIDITY_CRITICAL_DRY_PERCENT:
+        return "رطوبت خیلی پایین است؛ یک ظرف آب نزدیک گلدان‌ها کمک می‌کند، خاک ساکولنت‌ها را خیس نکن."
+    if value < HUMIDITY_LOW_PERCENT:
+        return "رطوبت پایین است؛ برای افزایش دستی، ظرف آب نزدیک گلدان‌ها بگذار یا آبیاری سطحی نکن."
+    if value < HUMIDITY_TARGET_MIN_PERCENT:
+        return "رطوبت کمی پایین‌تر از هدف است؛ فقط پایش کن."
+    if value > HUMIDITY_MOLD_RISK_PERCENT:
+        return "رطوبت خیلی بالاست؛ تهویه کوتاه بده و آبیاری را عقب بینداز."
+    if value > HUMIDITY_NOTICE_HIGH_PERCENT:
+        return "رطوبت برای آلوئه و سانسوریا زیاد است؛ هوا را کمی جابه‌جا کن."
+    if value > HUMIDITY_TARGET_MAX_PERCENT:
+        return "رطوبت کمی بالاتر از هدف است؛ اگر شب است، تهویه ملایم بهتر است."
+    return ""
+
+
+def _combined_action(temp_c, humidity):
+    if temp_c is None or humidity is None:
+        return ""
+    if temp_c < TEMP_SAFE_MIN_C and humidity > HUMIDITY_NOTICE_HIGH_PERCENT:
+        return "ترکیب هوای خنک و رطوبت بالا ریسک کپک می‌دهد؛ تهویه کوتاه و توقف آبیاری بهتر است."
+    if temp_c < TEMP_TARGET_MIN_C and humidity > HUMIDITY_MOLD_RISK_PERCENT:
+        return "با این رطوبت بالا، دمای زیر هدف می‌تواند کپک را سریع‌تر کند؛ اول تهویه بده."
     return ""
 
 
@@ -197,17 +270,20 @@ def _soil_action(value):
 
 def _required_actions(parameters):
     actions = []
+    combined_action = _combined_action(
+        parameters.get("temp_c"), parameters.get("humidity")
+    )
     temp_action = _temperature_action(parameters.get("temp_c"))
     humidity_action = _humidity_action(parameters.get("humidity"))
     soil_action = _soil_action(parameters.get("soil_moisture"))
 
-    for action in (temp_action, humidity_action, soil_action):
+    for action in (combined_action, temp_action, humidity_action, soil_action):
         if action:
             actions.append(action)
 
     if parameters.get("temp_c") is not None and parameters.get("humidity") is not None:
         if not actions:
-            return ["فعلا اقدامی لازم نیست.", "وضعیت را پایش کن."]
+            return ["شرایط فعلی برای این ترکیب گیاه‌ها مناسب است.", "فعلا فقط پایش کافی است."]
 
     return actions if actions else ["منتظر دریافت داده از سنسور بمان."]
 
@@ -217,7 +293,11 @@ def _action_lines(parameters):
     actions = _required_actions(parameters)
     for index, action in enumerate(actions):
         icon = "🔧"
-        if action.startswith("فعلا") or action.startswith("وضعیت"):
+        if (
+            action.startswith("شرایط")
+            or action.startswith("فعلا")
+            or action.startswith("وضعیت")
+        ):
             icon = "✅"
         if action.startswith("منتظر"):
             icon = "🟡"
@@ -505,8 +585,12 @@ class TelegramNotifier:
         pressure_icon = "🔵"
         if soil_enabled:
             soil_check = "مناسب" if light.soil_label == "soil_good" else "بررسی"
+            soil_position = _range_position(
+                soil_value, SOIL_MIN_PERCENT, SOIL_MAX_PERCENT, "%"
+            )
         else:
             soil_check = "غیرفعال"
+            soil_position = "سنسور خاک غیرفعال است"
         action_lines = _action_lines(parameters)
 
         return (
@@ -514,17 +598,22 @@ class TelegramNotifier:
             % (state_icon, _html_escape(_title_text(title)))
         ) + _pre(
             "وضعیت      : %s\n"
+            "پروفایل    : %s\n"
+            "ترکیب گیاه : %s\n"
+            "حالت       : پایش و راهنما؛ عملگر خودکار وصل نیست\n"
             "زمان       : %s  %s\n"
             "\n"
             "%s دما - %s\n"
             "مقدار      : %s C\n"
-            "محدوده سالم: %.0f-%.0f C\n"
+            "هدف روز    : %.0f-%.0f C\n"
             "وضعیت      : %s %s\n"
             "جایگاه     : %s %s\n"
             "\n"
             "%s رطوبت - %s\n"
             "مقدار      : %s %%\n"
-            "محدوده سالم: %.0f-%.0f %%\n"
+            "هدف        : %.0f-%.0f %%\n"
+            "حد توجه بالا: %.0f %%\n"
+            "ریسک کپک   : %.0f %%+\n"
             "وضعیت      : %s %s\n"
             "جایگاه     : %s %s\n"
             "\n"
@@ -538,7 +627,7 @@ class TelegramNotifier:
             "مقدار      : %s mbar\n"
             "ارتفاع     : %s m\n"
             "\n"
-            "🛠 اقدام لازم\n"
+            "🛠 راهنمای دستی\n"
             "%s\n"
             "\n"
             "نسخه‌ها\n"
@@ -546,31 +635,30 @@ class TelegramNotifier:
             "سنسور      : v%s"
             % (
                 _state_text(state),
+                PROFILE_TITLE,
+                PROFILE_DESCRIPTION,
                 time_value,
                 date_value,
                 temp_icon,
                 temp_check,
                 _fmt(temp_value),
-                TEMP_MIN_C,
-                TEMP_MAX_C,
+                TEMP_TARGET_MIN_C,
+                TEMP_TARGET_MAX_C,
                 temp_icon,
                 _label(light.temperature_label),
                 temp_icon,
-                _range_position(temp_value, TEMP_MIN_C, TEMP_MAX_C, "C"),
+                _temperature_position(temp_value),
                 humidity_icon,
                 humidity_check,
                 _fmt(humidity_value),
-                HUMIDITY_MIN_PERCENT,
-                HUMIDITY_MAX_PERCENT,
+                HUMIDITY_TARGET_MIN_PERCENT,
+                HUMIDITY_TARGET_MAX_PERCENT,
+                HUMIDITY_NOTICE_HIGH_PERCENT,
+                HUMIDITY_MOLD_RISK_PERCENT,
                 humidity_icon,
                 _label(light.humidity_label),
                 humidity_icon,
-                _range_position(
-                    humidity_value,
-                    HUMIDITY_MIN_PERCENT,
-                    HUMIDITY_MAX_PERCENT,
-                    "%",
-                ),
+                _humidity_position(humidity_value),
                 soil_icon,
                 soil_check,
                 _fmt(soil_value, 1),
@@ -579,7 +667,7 @@ class TelegramNotifier:
                 soil_icon,
                 _label(light.soil_label),
                 soil_icon,
-                _range_position(soil_value, SOIL_MIN_PERCENT, SOIL_MAX_PERCENT, "%"),
+                soil_position,
                 pressure_icon,
                 _fmt(parameters.get("pressure_mbar")),
                 _fmt(parameters.get("altitude_m"), 1),
@@ -698,11 +786,12 @@ class TelegramNotifier:
                     _pre(
                         "دستورهای ربات گلخانه\n"
                         "====================\n"
-                        "/status - دریافت آخرین گزارش\n"
+                        "/status - دریافت آخرین گزارش و راهنمای دستی\n"
                         "/report - دریافت همان گزارش وضعیت\n"
-                        "/soil - وضعیت سنسور خاک\n"
-                        "/soil_on - فعال کردن سنسور خاک\n"
-                        "/soil_off - غیرفعال کردن سنسور خاک\n"
+                        "/soil - وضعیت سنسور رطوبت خاک\n"
+                        "/soil_on - فعال کردن سنسور خاک نصب‌شده و کالیبره\n"
+                        "/soil_off - حذف عدد خاک از گزارش و هشدار\n"
+                        "حالت فعلی: پایش و راهنما؛ عملگر خودکار وصل نیست.\n"
                         "/help   - نمایش همین راهنما"
                     ),
                 )
