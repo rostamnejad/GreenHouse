@@ -27,11 +27,13 @@ WIFI_RECONNECT_INTERVAL_MS = 15000
 WIFI_CONNECT_TIMEOUT_MS = 10000
 OTA_STARTUP_DELAY_MS = 15000
 HTTP_CLIENT_TIMEOUT_SECONDS = 2
+SOIL_STATE_FILE = "soil_enabled.txt"
 PARAMETER_KEYS = (
     "temp_c",
     "humidity",
     "soil_moisture",
     "soil_raw",
+    "soil_enabled",
     "pressure_mbar",
     "altitude_m",
     "sensor_version",
@@ -42,6 +44,7 @@ PARAMETER_KEYS = (
     "jm",
     "jd",
 )
+_UNSET = object()
 
 
 class HumidityLight:
@@ -50,6 +53,7 @@ class HumidityLight:
         self.temp_c = None
         self.humidity = None
         self.soil_moisture = None
+        self.soil_enabled = True
         self.temperature_label = "waiting"
         self.humidity_label = "waiting"
         self.soil_label = "waiting"
@@ -105,6 +109,8 @@ class HumidityLight:
         return "too_humid", 1.0, (120, 0, 0)
 
     def _soil_condition(self, value):
+        if not self.soil_enabled:
+            return "soil_disabled", 0, (8, 8, 8)
         if value is None:
             return "waiting", 0, (8, 8, 8)
         if value < 15:
@@ -148,16 +154,17 @@ class HumidityLight:
 
         return (int(red / total), int(green / total), int(blue / total))
 
-    def set_conditions(self, temp_c=None, humidity=None, soil_moisture=None, log=True):
+    def set_conditions(self, temp_c=None, humidity=None, soil_moisture=_UNSET, log=True):
         if temp_c is not None:
             self.temp_c = temp_c
             self.has_reading = True
         if humidity is not None:
             self.humidity = humidity
             self.has_reading = True
-        if soil_moisture is not None:
+        if soil_moisture is not _UNSET:
             self.soil_moisture = soil_moisture
-            self.has_reading = True
+            if soil_moisture is not None:
+                self.has_reading = True
         self.updated_ms = time.ticks_ms()
 
         temp_label, temp_severity, temp_color = self._temperature_condition(self.temp_c)
@@ -185,7 +192,11 @@ class HumidityLight:
         else:
             self.base_color = soil_color
 
-        if self.temp_c is None and self.humidity is None and self.soil_moisture is None:
+        if (
+            self.temp_c is None
+            and self.humidity is None
+            and (self.soil_moisture is None or not self.soil_enabled)
+        ):
             self.label = "waiting"
         elif self.severity == 0:
             self.label = "good"
@@ -210,6 +221,12 @@ class HumidityLight:
 
     def set_humidity(self, value, log=True):
         self.set_conditions(humidity=value, log=log)
+
+    def set_soil_enabled(self, enabled, log=True):
+        self.soil_enabled = bool(enabled)
+        if not self.soil_enabled:
+            self.soil_moisture = None
+        self.set_conditions(soil_moisture=None if not self.soil_enabled else _UNSET, log=log)
 
     def _scale(self, color, level):
         return tuple(int(component * level) for component in color)
@@ -301,6 +318,81 @@ def wifi_credentials():
         return "", ""
 
 
+def config_value(name, default):
+    try:
+        import secrets
+
+        return getattr(secrets, name, default)
+    except Exception:
+        return default
+
+
+def static_ip_config():
+    ip = config_value("WIFI_STATIC_IP", "")
+    if not ip:
+        return None
+
+    gateway = config_value("WIFI_GATEWAY", "")
+    if not gateway:
+        print("WiFi static IP skipped: missing WIFI_GATEWAY")
+        return None
+
+    subnet = config_value("WIFI_SUBNET_MASK", "255.255.255.0")
+    dns = config_value("WIFI_DNS", gateway)
+    if not dns:
+        dns = gateway
+    return (ip, subnet, gateway, dns)
+
+
+def apply_static_ip(wlan):
+    config = static_ip_config()
+    if config is None:
+        return
+
+    try:
+        wlan.ifconfig(config)
+        print("WiFi static IP configured:", config[0])
+    except Exception as exc:
+        print("WiFi static IP error:", repr(exc))
+
+
+def load_soil_enabled():
+    try:
+        with open(SOIL_STATE_FILE, "r") as file:
+            return file.read().strip() != "0"
+    except Exception:
+        return bool(config_value("SOIL_MOISTURE_ENABLED", True))
+
+
+def save_soil_enabled(enabled):
+    with open(SOIL_STATE_FILE, "w") as file:
+        file.write("1" if enabled else "0")
+
+
+def apply_soil_enabled(enabled, parameters, light, persist=False):
+    enabled = bool(enabled)
+    parameters["soil_enabled"] = 1 if enabled else 0
+    if not enabled:
+        parameters["soil_moisture"] = None
+        parameters["soil_raw"] = None
+    light.set_soil_enabled(enabled, log=False)
+    if persist:
+        save_soil_enabled(enabled)
+
+
+def soil_command_response(enabled):
+    return (
+        "Soil moisture sensor: enabled"
+        if enabled
+        else "Soil moisture sensor: disabled"
+    )
+
+
+def sensor_config_body(parameters):
+    enabled = 1 if parameters.get("soil_enabled") else 0
+    return "soil_enabled=%d" % enabled
+
+
 def display_step(display, title, message=""):
     if display is not None:
         display.show_step(title, message)
@@ -309,6 +401,7 @@ def display_step(display, title, message=""):
 def connect_wifi(display=None, timeout_ms=WIFI_CONNECT_TIMEOUT_MS):
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
+    apply_static_ip(wlan)
     if wlan.isconnected():
         display_step(display, "WiFi OK", wlan.ifconfig()[0])
         return wlan
@@ -343,6 +436,7 @@ def connect_wifi(display=None, timeout_ms=WIFI_CONNECT_TIMEOUT_MS):
 
 def ensure_wifi_connected(wlan, timeout_ms=0, display=None):
     wlan.active(True)
+    apply_static_ip(wlan)
     if wlan.isconnected():
         return True
 
@@ -484,11 +578,11 @@ def status_body(parameters, light):
         humidity_value = "%.2f" % light.humidity
 
     soil_value = "None"
-    if light.soil_moisture is not None:
+    if parameters["soil_enabled"] and light.soil_moisture is not None:
         soil_value = "%.1f" % light.soil_moisture
 
     soil_raw_value = "None"
-    if parameters["soil_raw"] is not None:
+    if parameters["soil_enabled"] and parameters["soil_raw"] is not None:
         soil_raw_value = "%d" % parameters["soil_raw"]
 
     pressure_value = "None"
@@ -504,7 +598,8 @@ def status_body(parameters, light):
         sensor_version = "%d" % parameters["sensor_version"]
 
     return (
-        "time=%s jdate=%s temp_c=%s humidity=%s soil_moisture=%s soil_raw=%s "
+        "time=%s jdate=%s temp_c=%s humidity=%s soil_enabled=%d "
+        "soil_moisture=%s soil_raw=%s "
         "pressure_mbar=%s altitude_m=%s "
         "controller_version=%d sensor_version=%s temp_state=%s humidity_state=%s "
         "soil_state=%s temp_color=%s humidity_color=%s soil_color=%s status_color=%s "
@@ -514,6 +609,7 @@ def status_body(parameters, light):
             date_value,
             temp_value,
             humidity_value,
+            parameters["soil_enabled"],
             soil_value,
             soil_raw_value,
             pressure_value,
@@ -560,10 +656,12 @@ def print_serial_parameters(parameters, light):
     if light.humidity is not None:
         parts.append("HUMIDITY=%.2f" % light.humidity)
 
-    if light.soil_moisture is not None:
+    parts.append("SOIL_ENABLED=%d" % parameters["soil_enabled"])
+
+    if parameters["soil_enabled"] and light.soil_moisture is not None:
         parts.append("SOIL_MOISTURE=%.1f" % light.soil_moisture)
 
-    if parameters["soil_raw"] is not None:
+    if parameters["soil_enabled"] and parameters["soil_raw"] is not None:
         parts.append("SOIL_RAW=%d" % parameters["soil_raw"])
 
     if parameters["pressure_mbar"] is not None:
@@ -701,13 +799,23 @@ def main():
     parameters = {}
     for key in PARAMETER_KEYS:
         parameters[key] = None
+    apply_soil_enabled(load_soil_enabled(), parameters, light)
     display = make_display(APP_VERSION)
     display_step(display, "Boot", "starting...")
     wlan = connect_wifi(display=display)
 
+    def handle_soil_command(enabled):
+        if enabled is None:
+            return soil_command_response(bool(parameters["soil_enabled"]))
+
+        apply_soil_enabled(enabled, parameters, light, persist=True)
+        update_display(display, parameters, light, force=True)
+        return soil_command_response(bool(parameters["soil_enabled"]))
+
     telegram = TelegramNotifier(
         APP_VERSION,
         status_callback=lambda event: telegram_status(light, event),
+        soil_control=handle_soil_command,
     )
     display_step(display, "Server", "starting...")
     server = make_server()
@@ -788,6 +896,16 @@ def main():
                 for key in new_parameters:
                     parameters[key] = new_parameters[key]
 
+                soil_enabled = bool(parameters["soil_enabled"])
+                if not soil_enabled:
+                    parameters["soil_moisture"] = None
+                    parameters["soil_raw"] = None
+                elif (
+                    "soil_raw" in new_parameters
+                    and "soil_moisture" not in new_parameters
+                ):
+                    parameters["soil_moisture"] = None
+
                 if (
                     parameters["altitude_m"] is None
                     and parameters["pressure_mbar"] is not None
@@ -801,16 +919,25 @@ def main():
                     or parameters["humidity"] is not None
                     or parameters["soil_moisture"] is not None
                 ):
+                    soil_moisture = _UNSET
+                    if not soil_enabled:
+                        soil_moisture = None
+                    elif (
+                        "soil_moisture" in new_parameters
+                        or "soil_raw" in new_parameters
+                    ):
+                        soil_moisture = parameters["soil_moisture"]
+
                     light.set_conditions(
                         temp_c=parameters["temp_c"],
                         humidity=parameters["humidity"],
-                        soil_moisture=parameters["soil_moisture"],
+                        soil_moisture=soil_moisture,
                         log=False,
                     )
 
                 update_display(display, parameters, light, force=True)
                 print_serial_parameters(parameters, light)
-                send_response(client, "200 OK", status_body(parameters, light))
+                send_response(client, "200 OK", sensor_config_body(parameters))
                 telegram.update(parameters, light)
         except Exception as exc:
             print("REQUEST_ERROR", repr(exc), "from", address)

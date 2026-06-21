@@ -1,6 +1,16 @@
 WIFI_SSID = "YOUR_WIFI_NAME"
 WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"
 
+# Optional: keep controller IP stable so sensor boards can always find it.
+# Pick an address reserved on your router, or outside the router DHCP pool.
+WIFI_STATIC_IP = ""
+WIFI_SUBNET_MASK = "255.255.255.0"
+WIFI_GATEWAY = ""
+WIFI_DNS = ""
+
+# Default controller-side soil sensor state. Telegram commands can override it.
+SOIL_MOISTURE_ENABLED = True
+
 OTA_DEVICE = "controller"
 OTA_ENABLED = True
 OTA_MANIFEST_URL = "https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/master/controller/ota_manifest.json"

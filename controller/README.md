@@ -21,6 +21,11 @@ Serial parameter output:
 - `GET /status` returns the latest values as plain text.
 - `ALTITUDE_M` is a barometric estimate from BMP280 pressure using sea-level pressure `1013.25 mbar`; weather changes can move it.
 
+WiFi addressing:
+- Give the controller a stable IP so sensor boards do not lose it after DHCP changes.
+- Set `WIFI_STATIC_IP`, `WIFI_SUBNET_MASK`, `WIFI_GATEWAY`, and optionally `WIFI_DNS` in the controller board's local `secrets.py`.
+- Set the same controller IP in the sensor board's local `secrets.py` as `CONTROLLER_HOST`.
+
 RGB climate state:
 - Fast green blinks: Telegram message was sent successfully, then RGB returns to the live status mode.
 - Short red blinks: Telegram message send failed.

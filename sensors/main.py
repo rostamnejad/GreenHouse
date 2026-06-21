@@ -17,9 +17,9 @@ SOIL_MOISTURE_PIN = 34
 SOIL_DRY_RAW = 3000
 SOIL_WET_RAW = 1200
 SOIL_SAMPLE_COUNT = 8
-SOIL_RAW_MIN_VALID = 5
+SOIL_RAW_MIN_VALID = 100
 SOIL_RAW_MAX_VALID = 4090
-SOIL_DISPLAY_RAW_ONLY = True
+SOIL_DISPLAY_RAW_ONLY = False
 
 TM1637_CLK = 27
 TM1637_DIO = 26
@@ -179,10 +179,12 @@ class SoilMoistureSensor:
         )
         self.adc = None
 
-        if not self.enabled:
+        if self.enabled:
+            self._init_adc()
+        else:
             print("SOIL_MOISTURE disabled")
-            return
 
+    def _init_adc(self):
         self.adc = ADC(Pin(self.pin))
         try:
             self.adc.atten(ADC.ATTN_11DB)
@@ -202,6 +204,20 @@ class SoilMoistureSensor:
                 self.raw_max_valid,
             )
         )
+
+    def set_enabled(self, enabled):
+        enabled = bool(enabled)
+        if enabled == self.enabled:
+            return
+
+        self.enabled = enabled
+        if not self.enabled:
+            self.adc = None
+            print("SOIL_MOISTURE disabled by controller")
+            return
+
+        print("SOIL_MOISTURE enabled by controller")
+        self._init_adc()
 
     def _percent_from_raw(self, raw):
         if self.dry_raw == self.wet_raw:
@@ -407,7 +423,7 @@ def show_wifi_status(display, alarm):
     wlan = network.WLAN(network.STA_IF)
     display.scroll(" WIFI ", 170, 1)
     if wlan.isconnected():
-        display.scroll(" WIFI CONN V%03d " % APP_VERSION, 170, 1)
+        display.scroll(" WIFI CONN ", 170, 1)
         alarm.notify_wifi_connected()
     else:
         display.scroll(" WIFI NO  ", 170, 1)
@@ -434,6 +450,22 @@ def pressure_to_altitude_m(pressure_mbar):
     if pressure_mbar <= 0:
         return 0
     return 44330 * (1 - (pressure_mbar / SEA_LEVEL_PRESSURE_MBAR) ** 0.1903)
+
+
+def parse_controller_soil_enabled(response):
+    try:
+        text = response.decode()
+    except Exception:
+        try:
+            text = str(response)
+        except Exception:
+            return None
+
+    if "soil_enabled=0" in text:
+        return False
+    if "soil_enabled=1" in text:
+        return True
+    return None
 
 
 def send_parameters_to_controller(
@@ -492,10 +524,10 @@ def send_parameters_to_controller(
         sock.settimeout(2)
         sock.connect(addr)
         sock.send(request.encode())
-        response = sock.recv(80)
+        response = sock.recv(160)
         sock.close()
         print("CONTROLLER_SEND_OK", response.split(b"\r\n", 1)[0])
-        return True
+        return parse_controller_soil_enabled(response)
     except Exception as exc:
         print("CONTROLLER_SEND_ERROR", repr(exc))
         if sock is not None:
@@ -503,7 +535,7 @@ def send_parameters_to_controller(
                 sock.close()
             except Exception:
                 pass
-        return False
+        return None
 
 
 def gregorian_to_jalali(gy, gm, gd):
@@ -550,11 +582,10 @@ def ota_status(display, event, local_version, remote_version, path):
     if event == "checking":
         display.show("OTA ")
     elif event == "up_to_date":
-        display.show_version(local_version)
+        pass
     elif event == "update_available":
         display.show("UPD ")
         sleep(1)
-        display.show_version(remote_version)
     elif event in ("downloading", "installing"):
         display.show("UPD ")
     elif event == "installed":
@@ -647,7 +678,7 @@ def main():
             altitude_m = pressure_to_altitude_m(pressure_mbar)
             now = local_time()
             jy, jm, jd = gregorian_to_jalali(now[0], now[1], now[2])
-            send_parameters_to_controller(
+            controller_soil_enabled = send_parameters_to_controller(
                 temp_c,
                 humidity,
                 pressure_mbar,
@@ -659,6 +690,8 @@ def main():
                 jm,
                 jd,
             )
+            if controller_soil_enabled is not None:
+                soil_sensor.set_enabled(controller_soil_enabled)
             print(
                 "TIME=%02d:%02d:%02d JDATE=%04d/%02d/%02d TEMP_C=%.2f HUMIDITY=%.2f PRESSURE_MBAR=%.2f ALTITUDE_M=%.1f SOIL_MOISTURE=%s SOIL_RAW=%s"
                 % (
@@ -677,34 +710,18 @@ def main():
                 )
             )
 
-            if show_raw_only:
+            if show_raw_only and soil_sensor.enabled:
                 show_soil_raw(display, soil_raw)
                 sleep(4)
                 continue
 
-            display.show_time(now[3], now[4])
-            sleep(3)
-            display.show_month_day(jm, jd)
-            sleep(3)
             display.show("T%3d" % int(round(temp_c)))
             sleep(3)
             display.show("H%3d" % int(round(humidity)))
             sleep(3)
-            pressure_value = int(round(pressure_mbar))
-            if pressure_value < 1000:
-                display.show("P%3d" % pressure_value)
-            else:
-                display.show("%4d" % pressure_value)
-            sleep(3)
-            if soil_moisture is not None:
+            if soil_sensor.enabled and soil_moisture is not None:
                 display.show("S%3d" % int(round(soil_moisture)))
                 sleep(3)
-            display.show("ALT ")
-            sleep(1)
-            display.show("%4d" % int(round(altitude_m)))
-            sleep(3)
-            display.show_version(APP_VERSION)
-            sleep(3)
         except Exception as exc:
             print("DISPLAY_LOOP_ERROR", repr(exc))
             display.show("Err ")

@@ -34,6 +34,7 @@ LABEL_TEXT = {
     "soil_good": "مناسب",
     "soil_wet": "خاک مرطوب",
     "soil_too_wet": "خاک خیلی خیس",
+    "soil_disabled": "غیرفعال",
 }
 STATE_TEXT = {
     "good": "سالم",
@@ -84,6 +85,7 @@ LABEL_ICON = {
     "soil_good": "🟢",
     "soil_wet": "🟠",
     "soil_too_wet": "🔴",
+    "soil_disabled": "⚪",
 }
 
 
@@ -241,10 +243,15 @@ def _sensor_age(light):
     return None
 
 
+def _soil_enabled(light):
+    return getattr(light, "soil_enabled", True)
+
+
 class TelegramNotifier:
-    def __init__(self, controller_version, status_callback=None):
+    def __init__(self, controller_version, status_callback=None, soil_control=None):
         self.controller_version = controller_version
         self.status_callback = status_callback
+        self.soil_control = soil_control
         self.disabled_logged = False
         self.last_alert_ms = None
         self.last_report_ms = time.ticks_ms()
@@ -487,6 +494,7 @@ class TelegramNotifier:
         temp_value = parameters.get("temp_c")
         humidity_value = parameters.get("humidity")
         soil_value = parameters.get("soil_moisture")
+        soil_enabled = _soil_enabled(light)
         temp_icon = _label_icon(light.temperature_label)
         humidity_icon = _label_icon(light.humidity_label)
         soil_icon = _label_icon(light.soil_label)
@@ -495,7 +503,10 @@ class TelegramNotifier:
             "مناسب" if light.humidity_label == "humidity_good" else "بررسی"
         )
         pressure_icon = "🔵"
-        soil_check = "مناسب" if light.soil_label == "soil_good" else "بررسی"
+        if soil_enabled:
+            soil_check = "مناسب" if light.soil_label == "soil_good" else "بررسی"
+        else:
+            soil_check = "غیرفعال"
         action_lines = _action_lines(parameters)
 
         return (
@@ -689,9 +700,21 @@ class TelegramNotifier:
                         "====================\n"
                         "/status - دریافت آخرین گزارش\n"
                         "/report - دریافت همان گزارش وضعیت\n"
+                        "/soil - وضعیت سنسور خاک\n"
+                        "/soil_on - فعال کردن سنسور خاک\n"
+                        "/soil_off - غیرفعال کردن سنسور خاک\n"
                         "/help   - نمایش همین راهنما"
                     ),
                 )
+            elif command in ("/soil", "/soil_status"):
+                if self.soil_control is not None:
+                    self._send(config, _pre(self.soil_control(None)))
+            elif command in ("/soil_on", "/soil_enable"):
+                if self.soil_control is not None:
+                    self._send(config, _pre(self.soil_control(True)))
+            elif command in ("/soil_off", "/soil_disable"):
+                if self.soil_control is not None:
+                    self._send(config, _pre(self.soil_control(False)))
 
     def _update(self, parameters, light):
         config = self._config()

@@ -39,6 +39,7 @@ SHORT_LABELS = {
     "soil_good": "OK",
     "soil_wet": "SWET",
     "soil_too_wet": "SWET!",
+    "soil_disabled": "OFF",
 }
 
 
@@ -258,6 +259,7 @@ class OledStatusDisplay:
             humidity = self._float_value(light.humidity, 1)
             pressure = self._float_value(parameters.get("pressure_mbar"), 0)
             soil = self._float_value(light.soil_moisture, 1)
+            soil_enabled = getattr(light, "soil_enabled", True)
             link_issue = light.sensor_link_label() != "sensor_ok"
 
             self.display.fill(0)
@@ -269,7 +271,10 @@ class OledStatusDisplay:
             self._metric_row(
                 4, "AIR", "%s%%" % humidity, self._humidity_level(light), now
             )
-            self._metric_row(5, "SOIL", "%s%%" % soil, self._soil_level(light), now)
+            if soil_enabled:
+                self._metric_row(5, "SOIL", "%s%%" % soil, self._soil_level(light), now)
+            else:
+                self._row(5, "SOIL OFF")
             self._row(6, "P %smbar" % pressure)
             if link_issue:
                 self._metric_row(

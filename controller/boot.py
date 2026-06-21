@@ -40,9 +40,48 @@ class BootLight:
         time.sleep(seconds)
 
 
+def config_value(name, default):
+    try:
+        import secrets
+
+        return getattr(secrets, name, default)
+    except Exception:
+        return default
+
+
+def static_ip_config():
+    ip = config_value("WIFI_STATIC_IP", "")
+    if not ip:
+        return None
+
+    gateway = config_value("WIFI_GATEWAY", "")
+    if not gateway:
+        print("WiFi static IP skipped: missing WIFI_GATEWAY")
+        return None
+
+    subnet = config_value("WIFI_SUBNET_MASK", "255.255.255.0")
+    dns = config_value("WIFI_DNS", gateway)
+    if not dns:
+        dns = gateway
+    return (ip, subnet, gateway, dns)
+
+
+def apply_static_ip(wlan):
+    config = static_ip_config()
+    if config is None:
+        return
+
+    try:
+        wlan.ifconfig(config)
+        print("WiFi static IP configured:", config[0])
+    except Exception as exc:
+        print("WiFi static IP error:", repr(exc))
+
+
 def connect_wifi(light, timeout_seconds=30):
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
+    apply_static_ip(wlan)
 
     if wlan.isconnected():
         return wlan

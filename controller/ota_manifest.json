@@ -1,42 +1,42 @@
 {
-    "version":  22,
+    "version":  23,
     "device":  "controller",
     "files":  [
                   {
                       "path":  "version.py",
-                      "url":  "https://api.github.com/repos/rostamnejad/GreenHouse/contents/controller/version.py?ref=9af751cdd6cada59db9368d0c94b2364cc79d812",
-                      "sha256":  "6ac0099f813f252e0a17f19d5cec2af424ef9b893ff27c90675af08e794016cc"
+                      "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/version.py",
+                      "sha256":  "e603e7a4ccd20ada5be7c81be084d3a2684c9ced37da59b06976232c35abe3c2"
                   },
                   {
                       "path":  "main.py",
-                      "url":  "https://api.github.com/repos/rostamnejad/GreenHouse/contents/controller/main.py?ref=9af751cdd6cada59db9368d0c94b2364cc79d812",
-                      "sha256":  "ee3954e8f19ebe45f0a99539a5ad5b31966ac55d37b2ed5b9bf58248ffbddc66"
+                      "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/main.py",
+                      "sha256":  "4194684a297d8f35f1f2115bb771d0dfec4128e85be2c1415ce5be99503ecffe"
                   },
                   {
                       "path":  "net_http.py",
-                      "url":  "https://api.github.com/repos/rostamnejad/GreenHouse/contents/controller/net_http.py?ref=9af751cdd6cada59db9368d0c94b2364cc79d812",
+                      "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/net_http.py",
                       "sha256":  "9f6582f8dd666794460cb87627d4d1f1e4a758d9c4f57c2fff2b6e54d4f79f0e"
                   },
                   {
                       "path":  "ota_updater.py",
-                      "url":  "https://api.github.com/repos/rostamnejad/GreenHouse/contents/controller/ota_updater.py?ref=9af751cdd6cada59db9368d0c94b2364cc79d812",
+                      "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/ota_updater.py",
                       "sha256":  "0f73def3b4b9b8b0a8ab27ae4125185d5a049dd7e1d077ca9e10539154d4243c"
                   },
                   {
                       "path":  "telegram_notifier.py",
-                      "url":  "https://api.github.com/repos/rostamnejad/GreenHouse/contents/controller/telegram_notifier.py?ref=9af751cdd6cada59db9368d0c94b2364cc79d812",
-                      "sha256":  "edd58c816b24f738511b9d2cf3978ac72a5b611dc0aa3790011e73122305555d"
+                      "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/telegram_notifier.py",
+                      "sha256":  "1e9667be9c5d363392ac85659fe94030765f22659c35f410d89679a37bad1079"
                   },
                   {
                       "path":  "ssd1306.py",
-                      "url":  "https://api.github.com/repos/rostamnejad/GreenHouse/contents/controller/ssd1306.py?ref=9af751cdd6cada59db9368d0c94b2364cc79d812",
+                      "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/ssd1306.py",
                       "sha256":  "ec84e5494eaeb2e129e213014095f3166cda11e2516ae4fbc805f45dda9df394"
                   },
                   {
                       "path":  "oled_display.py",
-                      "url":  "https://api.github.com/repos/rostamnejad/GreenHouse/contents/controller/oled_display.py?ref=9af751cdd6cada59db9368d0c94b2364cc79d812",
-                      "sha256":  "8097d6b5939b406af0439950c2c16b853bfe302306005f78ee39445785e2c1ae"
+                      "url":  "https://raw.githubusercontent.com/rostamnejad/GreenHouse/master/controller/oled_display.py",
+                      "sha256":  "a12ed1e93c627e2e76866feeb46eb6deb919c51f4c50f7a1dfbcf6b160cc3e85"
                   }
               ],
-    "signature":  "4b09e3c9cda615bb6007ff3a855c4330cb797ce0d54996b51c737603112132cd"
+    "signature":  "fe891ba5b53a212b26ae0f6f8fef3ebfc445ec33ea5db4edca91b0f8160a9063"
 }
