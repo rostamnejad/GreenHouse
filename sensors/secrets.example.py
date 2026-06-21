@@ -1,6 +1,10 @@
 WIFI_SSID = "YOUR_WIFI_NAME"
 WIFI_PASSWORD = "YOUR_WIFI_PASSWORD"
 
+# Use the controller board's stable IP address.
+CONTROLLER_HOST = "YOUR_CONTROLLER_IP"
+CONTROLLER_PORT = 80
+
 OTA_DEVICE = "sensors"
 OTA_ENABLED = True
 OTA_MANIFEST_URL = "https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/master/sensors/ota_manifest.json"
@@ -23,6 +27,9 @@ OTA_ALLOW_BOOT_UPDATE = False
 SOIL_MOISTURE_ENABLED = True
 SOIL_MOISTURE_PIN = 34
 SOIL_SAMPLE_COUNT = 8
+SOIL_RAW_MIN_VALID = 5
+SOIL_RAW_MAX_VALID = 4090
+SOIL_DISPLAY_RAW_ONLY = True
 
 # Calibrate these after installation:
 # 1. Read SOIL_RAW with the probe in dry soil/air and set SOIL_DRY_RAW.

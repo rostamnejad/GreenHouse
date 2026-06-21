@@ -17,6 +17,9 @@ SOIL_MOISTURE_PIN = 34
 SOIL_DRY_RAW = 3000
 SOIL_WET_RAW = 1200
 SOIL_SAMPLE_COUNT = 8
+SOIL_RAW_MIN_VALID = 5
+SOIL_RAW_MAX_VALID = 4090
+SOIL_DISPLAY_RAW_ONLY = True
 
 TM1637_CLK = 27
 TM1637_DIO = 26
@@ -168,6 +171,12 @@ class SoilMoistureSensor:
         self.dry_raw = int(config_value("SOIL_DRY_RAW", SOIL_DRY_RAW))
         self.wet_raw = int(config_value("SOIL_WET_RAW", SOIL_WET_RAW))
         self.sample_count = max(1, int(config_value("SOIL_SAMPLE_COUNT", SOIL_SAMPLE_COUNT)))
+        self.raw_min_valid = int(
+            config_value("SOIL_RAW_MIN_VALID", SOIL_RAW_MIN_VALID)
+        )
+        self.raw_max_valid = int(
+            config_value("SOIL_RAW_MAX_VALID", SOIL_RAW_MAX_VALID)
+        )
         self.adc = None
 
         if not self.enabled:
@@ -184,8 +193,14 @@ class SoilMoistureSensor:
         except Exception:
             pass
         print(
-            "SOIL_MOISTURE ready PIN=%d DRY_RAW=%d WET_RAW=%d"
-            % (self.pin, self.dry_raw, self.wet_raw)
+            "SOIL_MOISTURE ready PIN=%d DRY_RAW=%d WET_RAW=%d VALID_RAW=%d..%d"
+            % (
+                self.pin,
+                self.dry_raw,
+                self.wet_raw,
+                self.raw_min_valid,
+                self.raw_max_valid,
+            )
         )
 
     def _percent_from_raw(self, raw):
@@ -213,6 +228,10 @@ class SoilMoistureSensor:
             sleep_ms(5)
 
         raw = int(total / self.sample_count)
+        if raw <= self.raw_min_valid or raw >= self.raw_max_valid:
+            print("SOIL_MOISTURE_RAW_INVALID", raw)
+            return None, raw
+
         return self._percent_from_raw(raw), raw
 
 
@@ -433,12 +452,17 @@ def send_parameters_to_controller(
     try:
         import socket
 
+        controller_host = str(config_value("CONTROLLER_HOST", CONTROLLER_HOST))
+        controller_port = int(config_value("CONTROLLER_PORT", CONTROLLER_PORT))
+
         soil_query = ""
-        if soil_moisture is not None and soil_raw is not None:
-            soil_query = "&soil_moisture=%.1f&soil_raw=%d" % (
-                soil_moisture,
-                soil_raw,
-            )
+        if soil_raw is not None:
+            soil_query = "&soil_raw=%d" % soil_raw
+            if soil_moisture is not None:
+                soil_query = "&soil_moisture=%.1f%s" % (
+                    soil_moisture,
+                    soil_query,
+                )
 
         request = (
             "GET /parameters?temp_c=%.2f&humidity=%.2f&pressure_mbar=%.2f&altitude_m=%.1f"
@@ -460,10 +484,10 @@ def send_parameters_to_controller(
             jy,
             jm,
             jd,
-            CONTROLLER_HOST,
+            controller_host,
         )
 
-        addr = socket.getaddrinfo(CONTROLLER_HOST, CONTROLLER_PORT)[0][-1]
+        addr = socket.getaddrinfo(controller_host, controller_port)[0][-1]
         sock = socket.socket()
         sock.settimeout(2)
         sock.connect(addr)
@@ -566,6 +590,19 @@ def ota_check_interval_ms():
     return int(seconds * 1000)
 
 
+def soil_display_raw_only():
+    return bool(config_value("SOIL_DISPLAY_RAW_ONLY", SOIL_DISPLAY_RAW_ONLY))
+
+
+def show_soil_raw(display, soil_raw):
+    if soil_raw is None:
+        display.show("----")
+        return
+
+    soil_raw = max(0, min(9999, int(soil_raw)))
+    display.show("%04d" % soil_raw)
+
+
 def main():
     i2c = I2C(0, sda=Pin(I2C_SDA), scl=Pin(I2C_SCL), freq=100000)
     mux = TCA9548A(i2c, I2C_MUX_ADDR)
@@ -579,6 +616,7 @@ def main():
     mux.select(SHT20_CHANNEL)
     sensor = SHT20(i2c, SHT20_ADDR)
     soil_sensor = SoilMoistureSensor()
+    show_raw_only = soil_display_raw_only()
     last_time_sync = 0
     last_ota_check_ms = time.ticks_ms()
     display.show_version(APP_VERSION)
@@ -638,6 +676,11 @@ def main():
                     "--" if soil_raw is None else "%d" % soil_raw,
                 )
             )
+
+            if show_raw_only:
+                show_soil_raw(display, soil_raw)
+                sleep(4)
+                continue
 
             display.show_time(now[3], now[4])
             sleep(3)
